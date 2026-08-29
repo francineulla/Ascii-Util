@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ASCII BPM Cycler</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <section id="previewPanel" class="preview-panel" aria-label="Live preview">
+      <canvas id="previewCanvas" aria-hidden="true"></canvas>
+      <pre id="previewAscii" aria-live="off"></pre>
+    </section>
+    <div class="preview-meta">
+      <span id="previewReadout">Preview ready</span>
+      <label class="preview-toggle"><input id="livePreview" type="checkbox"> Live preview</label>
+      <button id="refreshPreview" class="small-button" type="button">Refresh preview</button>
+    </div>
+
+    <main id="menu" class="menu-shell">
+      <section class="control-panel" aria-label="ASCII BPM Cycler controls">
+        <div class="title-row">
+          <div>
+            <p class="kicker">ASCII BPM Cycler</p>
+          </div>
+        </div>
+
+        <details class="control-section text-section" open>
+          <summary>Text</summary>
+          <label class="field">
+            <span>Lyrics / Words</span>
+            <textarea id="lyrics" spellcheck="false">pulse
+through
+static
+signal
+body
+echo
+light</textarea>
+          </label>
+          <div class="option-grid">
+          <label class="check"><input id="splitWords" type="checkbox" checked> Split pasted lyrics into words</label>
+          </div>
+        </details>
+
+        <details class="mask-panel control-section">
+          <summary>ASCII Mask / Stencil</summary>
+          <label class="field">
+            <span>Mask Art</span>
+            <textarea id="maskArt" spellcheck="false" placeholder="Paste ASCII art here. Non-space characters become the mask."></textarea>
+          </label>
+          <div class="grid three">
+            <label class="field">
+              <span>Mask Mode</span>
+              <select id="maskMode">
+                <option value="off">Off</option>
+                <option value="stencil">Stencil background</option>
+                <option value="reveal">Beat reveal</option>
+                <option value="texture">Use pasted characters</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Mask Layer</span>
+              <select id="maskLayer">
+                <option value="behind">Behind words</option>
+                <option value="front">In front</option>
+                <option value="replace">Replace words</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Mask Scale <output id="maskScaleValue">1</output></span>
+              <input id="maskScale" type="range" min="1" max="8" value="1">
+            </label>
+          </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>Core</summary>
+          <div class="grid three">
+          <label class="field">
+            <span>Seed</span>
+            <div class="inline-control">
+              <input id="seed" type="text" value="signal-808" autocomplete="off">
+              <button id="randomizeSeed" class="icon-button" type="button" title="Randomize seed" aria-label="Randomize seed">&#8635;</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>BPM</span>
+            <input id="bpm" type="number" min="20" max="360" step="1" value="128">
+          </label>
+          <label class="field">
+            <span>Colour Mode</span>
+            <select id="colorMode">
+              <option value="classic">Classic glow</option>
+              <option value="prism" selected>Randomized field</option>
+              <option value="spotlight">Word spotlight</option>
+              <option value="thermal">Thermal depth</option>
+            </select>
+          </label>
+          </div>
+          <div class="option-grid">
+          <label class="check"><input id="lockSeed" type="checkbox"> Lock seed when randomizing</label>
+          </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>Visual Texture</summary>
+          <div class="grid three">
+          <label class="field">
+            <span>Background Engine</span>
+            <select id="backgroundMode">
+              <option value="ray">Ray field</option>
+              <option value="starfield">Starfield warp</option>
+              <option value="galaxy">Rotating galaxy</option>
+              <option value="plasma">Plasma</option>
+              <option value="rain">Rain fall</option>
+              <option value="maze">Maze circuit</option>
+              <option value="vortex">Vortex lens</option>
+              <option value="terrain">Wire terrain</option>
+              <option value="scope">Scope trace</option>
+              <option value="blocks">Data blocks</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Character Set</span>
+            <select id="charsetPreset">
+              <option value="full">Full ramp</option>
+              <option value="minimal">Minimal</option>
+              <option value="dots">Dots</option>
+              <option value="numbers">Numbers</option>
+              <option value="binary">Binary</option>
+              <option value="punctuation">Punctuation</option>
+              <option value="slashes">Slashes</option>
+              <option value="waves">Waves</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Custom Characters</span>
+            <input id="customCharset" type="text" value="@%#*+=-:. " autocomplete="off">
+          </label>
+          </div>
+          <div class="option-grid">
+          <label class="check"><input id="invert" type="checkbox"> Invert</label>
+          <label class="check"><input id="scanlines" type="checkbox" checked> Scanlines</label>
+          </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>Timing</summary>
+          <div class="grid three">
+          <label class="field">
+            <span>Beat Timing</span>
+            <select id="beatRate">
+              <option value="1">Every beat</option>
+              <option value="0.125">1/8 beat</option>
+              <option value="0.25">1/4 beat</option>
+              <option value="0.5">1/2 beat</option>
+              <option value="2">Hold 2 beats</option>
+              <option value="4">Hold 4 beats</option>
+              <option value="8">Hold 8 beats</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Word Motion</span>
+            <select id="wordMotion">
+              <option value="pulse">Center pulse</option>
+              <option value="slide">Slide</option>
+              <option value="zoom">Zoom</option>
+              <option value="jitter">Jitter cut</option>
+              <option value="orbit">Orbit</option>
+              <option value="stack">Strobe stack</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Palette</span>
+            <select id="palette">
+              <option value="cyber">Cyber neon</option>
+              <option value="terminal">Terminal green</option>
+              <option value="amber">VT220 amber</option>
+              <option value="apple">Apple II green</option>
+              <option value="commodore">Commodore 64</option>
+              <option value="dos">DOS blue</option>
+              <option value="vga">High contrast VGA</option>
+            </select>
+          </label>
+          </div>
+          <div class="grid three">
+          <label class="field">
+            <span>Bar Length</span>
+            <select id="barLength">
+              <option value="4">4 beats</option>
+              <option value="3">3 beats</option>
+              <option value="5">5 beats</option>
+              <option value="6">6 beats</option>
+              <option value="7">7 beats</option>
+              <option value="8">8 beats</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Section Bars</span>
+            <input id="sectionBars" type="number" min="1" max="32" step="1" value="8">
+          </label>
+          <label class="field">
+            <span>Transition</span>
+            <select id="transitionMode">
+              <option value="cut">Cut now</option>
+              <option value="beat">Next beat</option>
+              <option value="bar">Next bar</option>
+              <option value="fade">Beat fade</option>
+            </select>
+          </label>
+          </div>
+          <div class="option-grid">
+          <label class="check"><input id="beatFlash" type="checkbox" checked> Beat flash</label>
+          <label class="check"><input id="downbeatFlash" type="checkbox"> Downbeat flash only</label>
+          <label class="check"><input id="midiSync" type="checkbox"> MIDI tempo sync</label>
+          <label class="check"><input id="autoSections" type="checkbox"> Auto sections</label>
+          </div>
+        </details>
+
+        <details class="control-section">
+          <summary>Performance</summary>
+          <div class="grid three">
+          <label class="field">
+            <span>Quality</span>
+            <select id="quality">
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="high">High</option>
+              <option value="ultra">Ultra</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>FPS Limit</span>
+            <select id="fpsCap">
+              <option value="auto">Auto</option>
+              <option value="15">15 FPS</option>
+              <option value="24">24 FPS</option>
+              <option value="30">30 FPS</option>
+              <option value="45">45 FPS</option>
+              <option value="60">60 FPS</option>
+              <option value="0">Uncapped</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Lyric Mode</span>
+            <select id="lyricMode">
+              <option value="words">Words</option>
+              <option value="phrases">Phrases</option>
+              <option value="markup">Markup words</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Capture Size</span>
+            <select id="captureSize">
+              <option value="window">Window</option>
+              <option value="1920x1080">1920 x 1080</option>
+              <option value="1080x1920">1080 x 1920</option>
+              <option value="1280x720">1280 x 720</option>
+              <option value="720x720">720 x 720</option>
+            </select>
+          </label>
+          </div>
+          <div class="option-grid">
+          <label class="check"><input id="recordingMode" type="checkbox"> Recording mode</label>
+          <label class="check"><input id="stageBeatIndicator" type="checkbox"> Stage beat indicator</label>
+          <label class="check"><input id="fullscreenOnStart" type="checkbox"> Fullscreen on Go</label>
+          </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>Intensity</summary>
+          <div class="grid three">
+          <label class="field">
+            <span>Glyph Size <output id="glyphSizeValue">13</output></span>
+            <input id="glyphSize" type="range" min="8" max="24" value="13">
+          </label>
+          <label class="field">
+            <span>Word Density <output id="densityValue">4</output></span>
+            <input id="density" type="range" min="1" max="8" value="4">
+          </label>
+          <label class="field">
+            <span>Glitch <output id="glitchValue">0</output></span>
+            <input id="glitch" type="range" min="0" max="100" value="0">
+          </label>
+          </div>
+
+          <div class="grid two">
+          <label class="field">
+            <span>Word Halo Size <output id="haloSizeValue">0</output></span>
+            <input id="haloSize" type="range" min="0" max="24" value="0">
+          </label>
+          <label class="field">
+            <span>Legibility</span>
+            <select id="legibilityMode">
+              <option value="balanced">Balanced</option>
+              <option value="readable">Readable</option>
+              <option value="chaotic">Chaotic</option>
+            </select>
+          </label>
+          </div>
+          <div class="option-grid">
+          <label class="check"><input id="wordHalo" type="checkbox"> Word halo</label>
+          <label class="check"><input id="backgroundOnly" type="checkbox"> Background only</label>
+          </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>Utilities</summary>
+          <div class="utility-panel">
+          <button id="tapTempo" class="small-button" type="button">Tap tempo</button>
+          <button id="fullscreenButton" class="small-button" type="button">Fullscreen</button>
+          <button id="copyShareUrl" class="small-button" type="button">Copy share URL</button>
+          <button id="copyObsUrl" class="small-button" type="button">Copy OBS URL</button>
+          <button id="saveFrame" class="small-button" type="button">Save frame</button>
+          <button id="panicButton" class="small-button hot" type="button">Panic look</button>
+          <button id="connectMidi" class="small-button" type="button">Connect MIDI</button>
+          <select id="midiInput" aria-label="MIDI input">
+            <option value="">No MIDI input</option>
+          </select>
+          <output id="tapReadout" class="readout">Tap BPM: --</output>
+          <output id="obsReadout" class="readout">OBS URL ready</output>
+          <output id="midiReadout" class="readout">MIDI: off</output>
+          </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>Scenes & Presets</summary>
+          <div id="sceneSlots" class="scene-slots" aria-label="Scene slots">
+          <button class="small-button scene-button empty" type="button" data-slot="1">Slot 1</button>
+          <button class="small-button scene-button empty" type="button" data-slot="2">Slot 2</button>
+          <button class="small-button scene-button empty" type="button" data-slot="3">Slot 3</button>
+          <button class="small-button scene-button empty" type="button" data-slot="4">Slot 4</button>
+          <button class="small-button scene-button empty" type="button" data-slot="5">Slot 5</button>
+          <button class="small-button scene-button empty" type="button" data-slot="6">Slot 6</button>
+          <button class="small-button scene-button empty" type="button" data-slot="7">Slot 7</button>
+          <button class="small-button scene-button empty" type="button" data-slot="8">Slot 8</button>
+          </div>
+          <div class="scene-actions">
+          <button id="storeScene" class="small-button" type="button">Store scene</button>
+          <button id="clearScenes" class="small-button" type="button">Clear scenes</button>
+          <output id="sceneReadout" class="readout">Scene slots ready</output>
+          </div>
+          <div class="preset-bank" aria-label="Default scene presets">
+          <label class="field">
+            <span>Default Scene</span>
+            <select id="defaultScenePreset">
+              <option value="lyricPrism">Lyric prism</option>
+              <option value="terminalRain">Terminal rain</option>
+              <option value="galaxyMask">Galaxy mask</option>
+              <option value="backgroundPulse">Background pulse</option>
+              <option value="midiStrobe">MIDI strobe</option>
+              <option value="phraseGlow">Phrase glow</option>
+              <option value="cleanTitles">Clean titles</option>
+              <option value="binaryTunnel">Binary tunnel</option>
+              <option value="amberPunch">Amber punch</option>
+              <option value="softBloom">Soft bloom</option>
+              <option value="hardCutNoise">Hard-cut noise</option>
+              <option value="verticalPoster">Vertical poster</option>
+              <option value="vortexLens">Vortex lens</option>
+              <option value="wireTerrain">Wire terrain</option>
+              <option value="scopeTrace">Scope trace</option>
+              <option value="dataBlocks">Data blocks</option>
+            </select>
+          </label>
+          <button id="applyDefaultScene" class="small-button preset-button" type="button">Apply default</button>
+          </div>
+          <div class="quick-random-panel">
+          <button id="randomizeVisual" class="small-button" type="button">Randomize visual</button>
+          <button id="randomizeMotion" class="small-button" type="button">Randomize motion</button>
+          <button id="randomizeColour" class="small-button" type="button">Randomize colour</button>
+          <button id="randomizeTiming" class="small-button" type="button">Randomize timing</button>
+          </div>
+          <div class="preset-panel">
+          <label class="field">
+            <span>Scene JSON</span>
+            <textarea id="presetData" spellcheck="false" placeholder="Export or paste scene JSON here"></textarea>
+          </label>
+          <div class="preset-actions">
+            <button id="copyPreset" class="small-button" type="button">Export scene</button>
+            <button id="loadPreset" class="small-button" type="button">Import scene</button>
+            <button id="copySceneBank" class="small-button" type="button">Export all scenes</button>
+            <button id="loadSceneBank" class="small-button" type="button">Import all scenes</button>
+            <button id="randomizeAll" class="small-button hot" type="button">Randomize all</button>
+          </div>
+          </div>
+        </details>
+
+        <div class="shortcut-strip" aria-label="Keyboard shortcuts">
+          <span><kbd>Esc</kbd> menu</span>
+          <span><kbd>Space</kbd> pause</span>
+          <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> BPM</span>
+          <span><kbd>B</kbd> background</span>
+          <span><kbd>H</kbd> halo</span>
+          <span><kbd>I</kbd> invert</span>
+          <span><kbd>S</kbd> scanlines</span>
+          <span><kbd>M</kbd> motion</span>
+          <span><kbd>0</kbd> panic</span>
+          <span><kbd>1-8</kbd> scenes</span>
+        </div>
+
+        <button id="start" class="start-button" type="button">Go</button>
+      </section>
+    </main>
+
+    <section id="stage" class="stage" aria-label="ASCII art playback" hidden>
+      <canvas id="asciiCanvas" aria-hidden="true"></canvas>
+      <pre id="ascii" aria-live="off"></pre>
+      <div id="stageHud" class="stage-hud" hidden>
+        <span id="beatDot" class="beat-dot"></span>
+        <span id="stageInfo">128 BPM</span>
+      </div>
+      <div id="beat" class="beat"></div>
+    </section>
+
+    <script src="app.js"></script>
+  </body>
+</html>
