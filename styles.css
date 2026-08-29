@@ -88,7 +88,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: start;
+  align-items: center;
   margin-bottom: 14px;
 }
 
@@ -136,6 +136,19 @@ textarea {
 
 .control-section summary::marker {
   color: var(--cool);
+}
+
+.control-section summary::before {
+  content: "\25B8";
+  width: 14px;
+  flex: 0 0 auto;
+  color: var(--cool);
+  transform-origin: center;
+  transition: transform 120ms ease-out;
+}
+
+.control-section[open] summary::before {
+  transform: rotate(90deg);
 }
 
 .control-section[open] {
@@ -293,15 +306,10 @@ input[type="range"] {
 }
 
 .preview-meta {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  left: auto;
-  z-index: 12;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: end;
+  justify-content: flex-end;
   gap: 8px;
   pointer-events: auto;
 }
@@ -336,6 +344,12 @@ input[type="range"] {
 .preview-meta button {
   min-height: 32px;
   padding: 0 10px;
+}
+
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--warm);
+  outline-offset: 3px;
 }
 
 .option-grid {
@@ -652,9 +666,13 @@ kbd {
     grid-template-columns: 1fr;
   }
 
+  .title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .preview-meta {
-    right: 10px;
-    bottom: 10px;
+    justify-content: flex-start;
   }
 
   .preview-meta span,

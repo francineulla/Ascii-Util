@@ -11,11 +11,6 @@
       <canvas id="previewCanvas" aria-hidden="true"></canvas>
       <pre id="previewAscii" aria-live="off"></pre>
     </section>
-    <div class="preview-meta">
-      <span id="previewReadout">Preview ready</span>
-      <label class="preview-toggle"><input id="livePreview" type="checkbox"> Live preview</label>
-      <button id="refreshPreview" class="small-button" type="button">Refresh preview</button>
-    </div>
 
     <main id="menu" class="menu-shell">
       <section class="control-panel" aria-label="ASCII BPM Cycler controls">
@@ -23,13 +18,18 @@
           <div>
             <p class="kicker">ASCII BPM Cycler</p>
           </div>
+          <div class="preview-meta">
+            <span id="previewReadout">Preview ready</span>
+            <label class="preview-toggle"><input id="livePreview" type="checkbox"> Live preview</label>
+            <button id="refreshPreview" class="small-button" type="button">Refresh preview</button>
+          </div>
         </div>
 
         <details class="control-section text-section" open>
           <summary>Text</summary>
           <label class="field">
             <span>Lyrics / Words</span>
-            <textarea id="lyrics" spellcheck="false">pulse
+            <textarea id="lyrics" maxlength="60000" spellcheck="false">pulse
 through
 static
 signal
@@ -46,7 +46,7 @@ light</textarea>
           <summary>ASCII Mask / Stencil</summary>
           <label class="field">
             <span>Mask Art</span>
-            <textarea id="maskArt" spellcheck="false" placeholder="Paste ASCII art here. Non-space characters become the mask."></textarea>
+            <textarea id="maskArt" maxlength="60000" spellcheck="false" placeholder="Paste ASCII art here. Non-space characters become the mask."></textarea>
           </label>
           <div class="grid three">
             <label class="field">
@@ -79,7 +79,7 @@ light</textarea>
           <label class="field">
             <span>Seed</span>
             <div class="inline-control">
-              <input id="seed" type="text" value="signal-808" autocomplete="off">
+              <input id="seed" type="text" maxlength="512" value="signal-808" autocomplete="off">
               <button id="randomizeSeed" class="icon-button" type="button" title="Randomize seed" aria-label="Randomize seed">&#8635;</button>
             </div>
           </label>
@@ -136,7 +136,7 @@ light</textarea>
           </label>
           <label class="field">
             <span>Custom Characters</span>
-            <input id="customCharset" type="text" value="@%#*+=-:. " autocomplete="off">
+            <input id="customCharset" type="text" maxlength="256" value="@%#*+=-:. " autocomplete="off">
           </label>
           </div>
           <div class="option-grid">
@@ -374,7 +374,7 @@ light</textarea>
           <div class="preset-panel">
           <label class="field">
             <span>Scene JSON</span>
-            <textarea id="presetData" spellcheck="false" placeholder="Export or paste scene JSON here"></textarea>
+            <textarea id="presetData" maxlength="2400000" spellcheck="false" placeholder="Export or paste scene JSON here"></textarea>
           </label>
           <div class="preset-actions">
             <button id="copyPreset" class="small-button" type="button">Export scene</button>

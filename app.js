@@ -112,11 +112,12 @@ const palettePresets = {
 };
 const borderGlyphs = ["#", "@", "%", "&", "8", "M", "W", "$"];
 const tinyWords = ["SYNC", "BPM", "PHASE", "ECHO", "NOISE", "SIGNAL", "FRAME", "BLOOM"];
-const maxPresetJsonChars = 240000;
+const maxPresetJsonChars = 300000;
 const maxTextareaChars = 60000;
 const maxTextInputChars = 512;
 const maxCustomCharsetChars = 256;
 const sceneSlotCount = 8;
+const maxSceneBankJsonChars = maxPresetJsonChars * sceneSlotCount;
 const letterFont = {
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
   B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
@@ -182,8 +183,6 @@ let state = {
   scenes: [],
   selectedSceneSlot: 1,
   pendingPreset: null,
-  pendingMode: "",
-  lastQueuedBeat: -1,
   lastRenderAt: 0,
   lastFrameAt: 0,
   fpsSamples: [],
@@ -267,7 +266,7 @@ const helpText = {
   glyphSize: "Controls the base size of each monospaced character.",
   density: "Controls how many small background lyric fragments are stamped into the scene.",
   glitch: "Controls background noise and horizontal tear intensity.",
-  haloSize: "Controls the size of the cleared area around large words when Word halo is enabled.",
+  haloSize: "Controls the cleared area around large words. Each step adds one character cell of halo.",
   legibilityMode: "A master readability macro. Readable calms the image; Chaotic pushes density and glitch harder.",
   beatFlash: "Adds a full-screen pulse on beats.",
   invert: "Inverts the stage colours for a bright-on-dark or dark-on-bright flip.",
@@ -300,7 +299,7 @@ const helpText = {
   loadPreset: "Imports the JSON box into the currently selected scene.",
   copySceneBank: "Exports all eight scene slots as JSON.",
   loadSceneBank: "Imports all eight scene slots from the JSON box.",
-  randomizeAll: "Randomizes most visual and timing settings. Lock seed prevents seed changes.",
+  randomizeAll: "Randomizes the current controls only. Lock seed prevents seed changes; stored scene slots are not overwritten.",
   sceneSlots: "Click a filled slot to recall it. Select a slot and press Store scene to save current settings.",
   storeScene: "Stores all current settings into the selected scene slot.",
   clearScenes: "Clears all saved scene slots from this browser.",
@@ -311,6 +310,7 @@ const helpText = {
   randomizeMotion: "Randomizes word movement, density, halo, and mask layering.",
   randomizeColour: "Randomizes colour mode, palette, inversion, and scanlines.",
   randomizeTiming: "Randomizes BPM, beat timing, flash behaviour, and FPS cap.",
+  presetData: "Holds exported scene JSON, full scene-bank JSON, or a share URL for importing.",
   start: "Starts playback with the current settings. Escape returns to the menu.",
   randomizeSeed: "Generates a new random seed."
 };
@@ -428,6 +428,25 @@ const optionHelpText = {
     readable: "Reduces clutter and increases word separation at render time.",
     chaotic: "Pushes density and glitch for rougher live energy."
   }
+};
+
+const presetHelpText = {
+  lyricPrism: "Colour-rich lyric typography over a balanced ray field.",
+  terminalRain: "Green terminal characters falling behind readable words.",
+  galaxyMask: "A rotating galaxy shaped by the ASCII mask panel.",
+  backgroundPulse: "A clean, beat-reactive background with lyric layers hidden.",
+  midiStrobe: "Fast high-contrast cuts designed for an incoming MIDI clock.",
+  phraseGlow: "Slower phrase-sized lyrics with a soft spotlight treatment.",
+  cleanTitles: "Large restrained title cards with minimal clutter.",
+  binaryTunnel: "A binary-character starfield tunnel with punchy motion.",
+  amberPunch: "Warm amber monitor tones with centered beat pulses.",
+  softBloom: "Low-glitch colour bloom with gentle word movement.",
+  hardCutNoise: "Dense noisy textures and abrupt rhythmic cuts.",
+  verticalPoster: "Large typography arranged for portrait capture.",
+  vortexLens: "Spiral lens motion with bright depth-coloured text.",
+  wireTerrain: "Retro wire-grid terrain under bold lyric forms.",
+  scopeTrace: "Oscilloscope traces with crisp terminal-style text.",
+  dataBlocks: "Chunky digital blocks, VGA colour, and stacked words."
 };
 
 const presetBank = {
@@ -800,12 +819,12 @@ function clamp(value, min, max) {
 
 function parseTokensFromText(text) {
   if (!text) return [{ text: "VOID", emphasis: "normal" }];
+  const mode = controls.lyricMode.value;
   const cleanLines = text
     .split(/\n+/)
-    .map((line) => line.replace(/\/\/.*$/, "").trim())
+    .map((line) => (mode === "markup" ? line.replace(/\/\/.*$/, "") : line).trim())
     .filter(Boolean);
   const source = cleanLines.join("\n");
-  const mode = controls.lyricMode.value;
   const pieces = mode === "phrases"
     ? cleanLines
     : mode === "markup"
@@ -814,7 +833,7 @@ function parseTokensFromText(text) {
         ? source.match(/[\p{L}\p{N}']+/gu) || []
       : cleanLines;
   const tokens = pieces
-    .map(parseToken)
+    .map((piece) => parseToken(piece, mode === "markup"))
     .filter((token) => token.text)
     .slice(0, 800);
   return tokens.length ? tokens : [{ text: "VOID", emphasis: "normal" }];
@@ -833,14 +852,14 @@ function parseSections() {
   return sections.length ? sections : [parseWords()];
 }
 
-function parseToken(piece) {
+function parseToken(piece, allowMarkup = false) {
   let text = piece.trim();
   let emphasis = "normal";
 
-  if (text.startsWith("*") && text.endsWith("*") && text.length > 2) {
+  if (allowMarkup && text.startsWith("*") && text.endsWith("*") && text.length > 2) {
     emphasis = "huge";
     text = text.slice(1, -1);
-  } else if (text.startsWith("[") && text.endsWith("]") && text.length > 2) {
+  } else if (allowMarkup && text.startsWith("[") && text.endsWith("]") && text.length > 2) {
     emphasis = "secondary";
     text = text.slice(1, -1);
   }
@@ -857,11 +876,15 @@ function tokenText(token) {
 
 function parseMask() {
   const rawLines = controls.maskArt.value.replace(/\r/g, "").split("\n");
-  const trimmed = rawLines.filter((line) => line.length);
-  if (!trimmed.length || controls.maskMode.value === "off") return null;
+  let start = 0;
+  let end = rawLines.length;
+  while (start < end && rawLines[start].length === 0) start += 1;
+  while (end > start && rawLines[end - 1].length === 0) end -= 1;
+  const lines = rawLines.slice(start, end);
+  if (!lines.some((line) => /[^\t ]/.test(line)) || controls.maskMode.value === "off") return null;
 
-  const width = Math.max(...trimmed.map((line) => line.length));
-  const rows = trimmed.map((line) => line.padEnd(width, " ").split(""));
+  const width = Math.max(...lines.map((line) => line.length));
+  const rows = lines.map((line) => line.padEnd(width, " ").split(""));
   return {
     width,
     height: rows.length,
@@ -937,8 +960,7 @@ function applyOptionMacros(options) {
   if (adjusted.legibilityMode === "readable") {
     adjusted.glitch = Math.min(adjusted.glitch, 0.18);
     adjusted.density = Math.min(adjusted.density, 2);
-    adjusted.wordHalo = true;
-    adjusted.haloSize = Math.max(adjusted.haloSize, 5);
+    adjusted.wordHalo = adjusted.wordHalo && adjusted.haloSize > 0;
   } else if (adjusted.legibilityMode === "chaotic") {
     adjusted.glitch = Math.max(adjusted.glitch, 0.62);
     adjusted.density = Math.max(adjusted.density, 6);
@@ -1619,20 +1641,20 @@ function getPreset() {
   }, {});
 }
 
-function parsePresetJson(raw, label = "Scene JSON") {
+function parsePresetJson(raw, label = "Scene JSON", maxChars = maxPresetJsonChars) {
   const text = String(raw || "").trim();
   if (!text) throw new Error(`${label} is empty.`);
-  if (text.length > maxPresetJsonChars) throw new Error(`${label} is too large.`);
+  if (text.length > maxChars) throw new Error(`${label} is too large.`);
   return JSON.parse(text);
 }
 
-function parsePresetInput(raw, label = "Scene JSON") {
+function parsePresetInput(raw, label = "Scene JSON", maxChars = maxPresetJsonChars) {
   const text = String(raw || "").trim();
   if (text.startsWith("#preset=")) return decodePresetFromUrl(text.slice(8));
   if (/^(file|https?):/i.test(text) && text.includes("#preset=")) {
     return decodePresetFromUrl(new URL(text, location.href).hash.slice(8));
   }
-  return parsePresetJson(text, label);
+  return parsePresetJson(text, label, maxChars);
 }
 
 function controlHasOption(control, value) {
@@ -1700,17 +1722,19 @@ async function copyPreset() {
 
 function loadPreset() {
   try {
-    const payload = parsePresetInput(controls.presetData.value);
+    const payload = parsePresetInput(controls.presetData.value, "Scene JSON", maxSceneBankJsonChars);
     if (payload.type === "ascii-bpm-scene-bank") {
       importSceneBank(payload);
       return;
     }
     const preset = payload.type === "ascii-bpm-scene" && payload.preset ? payload.preset : payload;
     applyPreset(preset);
-    storeScene(state.selectedSceneSlot);
+    const stored = storeScene(state.selectedSceneSlot);
     schedulePreview();
     if (state.running) restartPlayback(true);
-    controls.sceneReadout.textContent = `Imported scene ${state.selectedSceneSlot}`;
+    controls.sceneReadout.textContent = stored
+      ? `Imported scene ${state.selectedSceneSlot}`
+      : `Imported scene ${state.selectedSceneSlot}, but browser storage failed`;
   } catch (error) {
     controls.presetData.value = `Scene import failed: ${error.message}`;
   }
@@ -1739,18 +1763,20 @@ function importSceneBank(payload) {
   const scenes = Array.isArray(payload.scenes) ? payload.scenes.slice(0, sceneSlotCount) : [];
   state.scenes = Array.from({ length: sceneSlotCount }, (_, index) => scenes[index] ? normalizePreset(scenes[index]) : null);
   state.selectedSceneSlot = clamp(Number(payload.selectedSlot) || state.selectedSceneSlot, 1, 8);
-  saveSceneSlots();
+  const stored = saveSceneSlots();
   refreshSceneButtons();
   const selected = state.scenes[state.selectedSceneSlot - 1];
   if (selected) applyPreset(selected);
   schedulePreview();
   if (state.running) restartPlayback(true);
-  controls.sceneReadout.textContent = `Imported scene bank, selected ${state.selectedSceneSlot}`;
+  controls.sceneReadout.textContent = stored
+    ? `Imported scene bank, selected ${state.selectedSceneSlot}`
+    : "Imported scene bank, but browser storage failed";
 }
 
 function loadSceneBank() {
   try {
-    const payload = parsePresetInput(controls.presetData.value, "Scene bank JSON");
+    const payload = parsePresetInput(controls.presetData.value, "Scene bank JSON", maxSceneBankJsonChars);
     if (payload.type !== "ascii-bpm-scene-bank") {
       throw new Error("Expected an ascii-bpm-scene-bank JSON export.");
     }
@@ -1773,11 +1799,17 @@ function decodePresetFromUrl(hash) {
 
 function requestFullscreen() {
   const target = controls.stage.hidden ? document.documentElement : controls.stage;
-  if (target.requestFullscreen) target.requestFullscreen();
+  if (target.requestFullscreen) {
+    const request = target.requestFullscreen();
+    if (request && typeof request.catch === "function") request.catch(() => {});
+  }
 }
 
 function exitFullscreen() {
-  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+  if (document.fullscreenElement && document.exitFullscreen) {
+    const request = document.exitFullscreen();
+    if (request && typeof request.catch === "function") request.catch(() => {});
+  }
 }
 
 function tapTempo() {
@@ -1798,6 +1830,7 @@ function tapTempo() {
   const bpm = clamp(Math.round(60000 / average), 20, 360);
   controls.bpm.value = bpm;
   controls.tapReadout.textContent = `Tap BPM: ${bpm}`;
+  schedulePreview();
 }
 
 function setMidiStatus(message) {
@@ -2013,7 +2046,7 @@ function applyTooltips() {
 
   if (controls.defaultScenePreset) {
     for (const option of controls.defaultScenePreset.options) {
-      option.title = presetBank[option.value] ? "Applies this built-in look to the current scene." : "";
+      option.title = presetHelpText[option.value] || "Applies this built-in look to the current scene.";
     }
   }
 
@@ -2090,17 +2123,21 @@ function requestPresetChange(preset, label = "preset") {
     return;
   }
   const mode = controls.transitionMode.value;
-  state.pendingPreset = { preset, label, mode };
-  state.pendingMode = mode;
+  const beatMs = 60000 / state.options.bpm;
+  const timelineNow = state.paused ? state.pausedAt : performance.now();
+  const currentBeat = Math.max(0, Math.floor((timelineNow - state.startedAt) / beatMs));
+  const targetBeat = mode === "bar"
+    ? (Math.floor(currentBeat / state.options.barLength) + 1) * state.options.barLength
+    : currentBeat + 1;
+  state.pendingPreset = { preset, label, mode, targetBeat };
   controls.sceneReadout.textContent = mode === "bar" ? `Queued ${label} for next bar` : `Queued ${label} for next beat`;
 }
 
 function maybeApplyQueuedPreset(frame) {
-  if (!state.pendingPreset || state.lastQueuedBeat === frame.beatIndex) return false;
+  if (!state.pendingPreset) return false;
   const queued = state.pendingPreset;
-  const shouldApply = queued.mode === "bar" ? frame.beatInBar === 0 : frame.beatPhase > 0.92;
+  const shouldApply = frame.beatIndex >= queued.targetBeat;
   if (!shouldApply) return false;
-  state.lastQueuedBeat = frame.beatIndex;
   state.pendingPreset = null;
   applyPresetNow(queued.preset, queued.mode === "fade");
   controls.sceneReadout.textContent = `Applied ${queued.label}`;
@@ -2153,7 +2190,9 @@ function selectSceneSlot(slot) {
 
 function storeScene(slot = state.selectedSceneSlot) {
   state.scenes[slot - 1] = normalizePreset(getPreset());
-  if (saveSceneSlots()) controls.sceneReadout.textContent = `Stored scene ${slot}`;
+  const stored = saveSceneSlots();
+  if (stored) controls.sceneReadout.textContent = `Stored scene ${slot}`;
+  return stored;
 }
 
 function recallScene(slot = state.selectedSceneSlot) {
@@ -2165,8 +2204,7 @@ function recallScene(slot = state.selectedSceneSlot) {
 
 function clearScenes() {
   state.scenes = [];
-  saveSceneSlots();
-  controls.sceneReadout.textContent = "Cleared scenes";
+  if (saveSceneSlots()) controls.sceneReadout.textContent = "Cleared scenes";
 }
 
 function randomizeVisual() {
@@ -2182,7 +2220,6 @@ function randomizeVisual() {
   updateSliderReadouts();
   schedulePreview();
   controls.sceneReadout.textContent = `Randomized current scene ${state.selectedSceneSlot} only`;
-  if (state.running) restartPlayback();
 }
 
 function randomizeMotion() {
@@ -2274,6 +2311,7 @@ function randomizeAll() {
 function restartPlayback(fade = false) {
   if (!state.running) return;
   cancelAnimationFrame(state.raf);
+  state.pendingPreset = null;
   prepareStateFromControls();
   state.lastBeat = -1;
   state.lastRenderAt = 0;
@@ -2443,7 +2481,7 @@ function start() {
 }
 
 function stop() {
-  if (!state.running) return;
+  if (!state.running && controls.stage.hidden && !document.body.classList.contains("playing")) return;
   state.running = false;
   state.paused = false;
   cancelAnimationFrame(state.raf);
@@ -2507,6 +2545,9 @@ controls.midiSync.addEventListener("change", () => {
 });
 controls.livePreview.addEventListener("change", () => {
   state.previewStartedAt = performance.now();
+  state.lastPreviewFrameAt = 0;
+  state.previewFpsSamples = [];
+  state.currentPreviewFps = 0;
   if (controls.livePreview.checked) startPreviewLoop();
   else {
     stopPreviewLoop();
