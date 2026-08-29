@@ -112,3 +112,7 @@ The project is intentionally small:
 - `app.js`: render engines, timing, presets, scene storage, MIDI, and export logic
 
 Open `index.html` directly after editing to test changes.
+
+## License
+
+MIT License. See `LICENSE` for details.
