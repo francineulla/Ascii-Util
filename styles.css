@@ -55,6 +55,7 @@ body.playing .preview-meta {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -90,6 +91,16 @@ textarea {
   gap: 16px;
   align-items: center;
   margin-bottom: 14px;
+}
+
+.control-panel > .title-row {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 12px 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
 }
 
 .kicker {
@@ -161,6 +172,7 @@ textarea {
 }
 
 .control-section > .field,
+.control-section > p.readout,
 .control-section > .grid,
 .control-section > .option-grid,
 .control-section > .utility-panel,
@@ -177,12 +189,150 @@ textarea {
   margin-top: 0;
 }
 
+.visualizer-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.visualizer-picker .readout { margin: 0; grid-column: 1 / -1; }
+
+.atari-panel {
+  margin-bottom: 16px;
+  border-color: #80603d;
+  background: linear-gradient(110deg, rgba(45, 29, 18, 0.96), rgba(16, 18, 17, 0.96));
+}
+
+.atari-panel summary { color: #efc58a; }
+.atari-panel > .check { margin: 16px 14px 0; }
+.atari-panel input[type="range"] { accent-color: #edaf61; }
+.atari-intro {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 300px);
+  gap: 24px;
+  margin: 0 14px;
+  align-items: center;
+}
+.atari-intro p { color: #bcae9b; font-size: 13px; line-height: 1.6; }
+.atari-intro .atari-badge {
+  color: #f6e4c9;
+  font: 800 20px/1.3 ui-monospace, Consolas, monospace;
+  letter-spacing: 0.12em;
+}
+.atari-badge span { color: #d5a165; font-size: 12px; }
+.atari-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.atari-actions #atariStart { background: #edaf61; border-color: #edaf61; color: #1a130b; }
+#atariMonitor {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  aspect-ratio: 4 / 3;
+  border: 5px solid #24211e;
+  border-radius: 12px;
+  background: #000;
+  box-shadow: 0 0 0 1px #78614c;
+}
+.atari-note { margin: 16px 14px 0; line-height: 1.6; }
+.atari-panel select:disabled { opacity: 0.5; }
+.vm2-panel {
+  margin-bottom: 16px;
+  border-color: #487784;
+  background: linear-gradient(125deg, rgba(17, 37, 45, 0.98), rgba(25, 20, 41, 0.98));
+}
+.nethack-panel {
+  margin-bottom: 16px;
+  border-color: #7e784c;
+  background: linear-gradient(125deg, rgba(33, 38, 27, 0.98), rgba(29, 24, 20, 0.98));
+}
+.pixelmusic-panel {
+  margin-bottom: 16px;
+  border-color: #826195;
+  background: linear-gradient(125deg, rgba(39, 24, 50, 0.98), rgba(22, 28, 46, 0.98));
+}
+.pixelmusic-panel summary { color: #e4b2ef; }
+.pixelmusic-panel .atari-badge { color: #f3d5fa; }
+.pixelmusic-panel .atari-badge span { color: #eaa2c4; }
+.pixelmusic-panel input[type="range"] { accent-color: #dfa6ea; }
+#pixelmusicMonitor {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  background: #000;
+  border: 4px solid #30273a;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px #876296;
+}
+.nethack-panel summary { color: #e7d59a; }
+.nethack-panel .atari-badge { color: #e8debc; }
+.nethack-panel .atari-badge span { color: #a4bc7b; }
+.nethack-panel input[type="range"] { accent-color: #c7b770; }
+#nethackMonitor {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  background: #050807;
+  border: 4px solid #2c3026;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px #827650;
+}
+.vm2-panel summary { color: #8ce1e8; }
+.vm2-panel .atari-badge span { color: #8ce1e8; font-size: 26px; }
+.vm2-group,
+.control-group {
+  min-width: 0;
+  margin: 22px 14px 0;
+  padding: 0 0 4px;
+  border: 0;
+  border-top: 1px solid #36515b;
+}
+.vm2-group legend,
+.control-group legend { padding-right: 12px; color: #a8cdd8; font: 700 12px/1.4 ui-monospace, Consolas, monospace; }
+.control-group > .readout { margin-bottom: 0; }
+.pixelmusic-panel .control-group { border-color: #655071; }
+.pixelmusic-panel .control-group legend { color: #e4b2ef; }
+.pm-step-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 16px; align-items: stretch; }
+.pm-step-grid .small-button { width: 100%; }
+.pm-favorites { min-width: 0; margin: 20px 0 0; padding: 0; border: 0; }
+.pm-favorites legend { margin-bottom: 10px; }
+.pm-favorite-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pm-favorite-grid .check { min-width: 0; padding: 8px; font-size: 12px; }
+.pm-favorite-grid input { flex: 0 0 auto; }
+.pm-favorites:disabled { opacity: 0.55; }
+.vm2-panel input[type="range"] { accent-color: #75dbd7; }
+.vm2-panel input:disabled { opacity: 0.5; }
+#vm2Monitor {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  background: #000;
+  border: 4px solid #1c2c33;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px #486273;
+}
+@media (max-width: 620px) {
+  .atari-intro { grid-template-columns: 1fr; }
+  #atariMonitor { max-width: 360px; margin: 0 auto; }
+}
+
 .two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid.three:has(> [hidden]) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
 }
 
 .field {
@@ -197,7 +347,7 @@ textarea {
   gap: 10px;
   color: var(--muted);
   font-size: 13px;
-  cursor: help;
+  line-height: 1.4;
 }
 
 .field output {
@@ -261,8 +411,14 @@ select {
 
 input[type="range"] {
   width: 100%;
+  min-height: 28px;
+  margin: 0;
   accent-color: var(--hot);
 }
+
+input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
+.field:has(> :disabled) > span { opacity: 0.7; }
+.field output { white-space: nowrap; }
 
 .inline-control {
   display: grid;
@@ -347,6 +503,9 @@ input[type="range"] {
 }
 
 button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--warm);
   outline-offset: 3px;
@@ -370,7 +529,7 @@ summary:focus-visible {
   background: rgba(5, 12, 10, 0.62);
   color: #c5d8d2;
   font-size: 13px;
-  cursor: help;
+  cursor: pointer;
 }
 
 .check input {
@@ -385,7 +544,7 @@ summary:focus-visible {
 
 .utility-panel {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) repeat(3, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   align-items: center;
   margin: 20px 0 0;
@@ -395,12 +554,14 @@ summary:focus-visible {
   min-height: 42px;
   display: flex;
   align-items: center;
-  padding: 0 12px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--muted);
   background: rgba(5, 12, 10, 0.62);
-  font: 700 12px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  font: 700 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 #presetData {
@@ -457,8 +618,37 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
-.stage.fade-cut {
-  animation: fade-cut 220ms ease-out;
+.unsaved { color: #ffcc70; }
+.small-button:disabled { opacity: 0.45; cursor: default; }
+.grid > .scene-actions { display: flex; flex-wrap: wrap; align-items: center; }
+#audioMeter { width: 100%; align-self: center; }
+.audio-stereo-meters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 16px 14px 0;
+}
+.audio-channel { min-width: 0; }
+.audio-channel-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.audio-channel meter { display: block; width: 100%; min-width: 0; height: 24px; margin-top: 4px; }
+.audio-clip { padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font: 700 11px/1.4 ui-monospace, Consolas, monospace; }
+.audio-clip.clipping,
+.audio-clip[data-clipping="true"] { color: #230b08; background: #ffad95; border-color: #ffad95; }
+.scene-button { overflow-wrap: anywhere; }
+.scene-transition {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  z-index: 21;
+  pointer-events: none;
+}
+.transition-snapshot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
 }
 
 .shortcut-strip {
@@ -520,6 +710,7 @@ kbd {
 
 .small-button {
   min-height: 42px;
+  padding: 8px 12px;
   border-radius: 6px;
   font-weight: 750;
 }
@@ -537,7 +728,33 @@ kbd {
   color: #eafff8;
 }
 
-.stage.invert {
+.stage.invert { background: #fff; }
+
+.stage-controls {
+  position: absolute;
+  left: max(14px, env(safe-area-inset-left));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+.stage-controls .small-button { background: #17211eee; color: var(--ink); border: 1px solid var(--line); }
+.stage.controls-visible .stage-controls,
+.stage-controls:focus-within { opacity: 1; pointer-events: auto; }
+@media (hover: none) {
+  .stage:not(.recording) .stage-controls { opacity: 0.85; pointer-events: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-controls, .control-section summary::before { transition: none; }
+}
+
+.stage.invert > #ascii,
+.stage.invert > #asciiCanvas,
+.stage.invert > #beat,
+.stage.invert::after {
   filter: invert(1) contrast(1.35);
 }
 
@@ -549,10 +766,10 @@ kbd {
   pointer-events: none;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(255, 255, 255, 0.08) 0,
-    rgba(255, 255, 255, 0.08) 1px,
-    transparent 1px,
-    transparent 4px
+    var(--scanline-color, rgba(255, 255, 255, 0.08)) 0,
+    var(--scanline-color, rgba(255, 255, 255, 0.08)) var(--scanline-thickness, 1px),
+    transparent var(--scanline-thickness, 1px),
+    transparent var(--scanline-spacing, 4px)
   );
   mix-blend-mode: overlay;
 }
@@ -640,10 +857,6 @@ kbd {
   100% { opacity: 0.35; transform: scale(1); }
 }
 
-@keyframes fade-cut {
-  0% { filter: brightness(1.8) contrast(1.25); opacity: 0.35; }
-  100% { filter: brightness(1) contrast(1); opacity: 1; }
-}
 
 @media (max-width: 760px) {
   .menu-shell {
@@ -678,6 +891,14 @@ kbd {
   .preview-meta span,
   .preview-toggle,
   .preview-meta button {
-    font-size: 10px;
+    font-size: 11px;
+    min-height: 42px;
   }
+
+  .scene-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .quick-random-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  .scene-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

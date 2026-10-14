@@ -20,14 +20,229 @@
           </div>
           <div class="preview-meta">
             <span id="previewReadout">Preview ready</span>
-            <label class="preview-toggle"><input id="livePreview" type="checkbox"> Live preview</label>
+            <label for="livePreview" class="preview-toggle"><input id="livePreview" type="checkbox"> Live preview</label>
             <button id="refreshPreview" class="small-button" type="button">Refresh preview</button>
           </div>
         </div>
 
-        <details class="control-section text-section" open>
+        <section class="visualizer-picker" aria-label="Render mode">
+          <label for="toolMode" class="field">
+            <span>Render mode</span>
+            <select id="toolMode">
+              <option value="text">Text mode</option>
+              <option value="video">Video synthesizer mode</option>
+            </select>
+          </label>
+          <label for="visualizerMode" class="field" data-tools="video" hidden>
+            <span>Video synthesizer</span>
+            <select id="visualizerMode">
+              <option value="ascii" hidden>ASCII BPM Cycler</option>
+              <option value="atari">Atari Video Music</option>
+              <option value="vm2">Video Music 2</option>
+              <option value="nethack">NetHack dungeon</option>
+              <option value="pixelmusic">Pixelmusic 3000</option>
+            </select>
+          </label>
+          <p class="readout">Choose a mode, adjust its controls, then press Go. Your settings stay in place when you switch.</p>
+        </section>
+
+        <details id="pixelmusicPanel" class="control-section pixelmusic-panel" open hidden>
+          <summary>Pixelmusic 3000</summary>
+          <div class="atari-intro">
+            <div>
+              <p class="atari-badge">PIXELMUSIC <span>3000</span></p>
+              <p>Chunky stereo diamonds, striped shapes, and shifting four-colour palettes.</p>
+              <label for="pmInput" class="field"><span>Signal</span><select id="pmInput"><option value="demo">Demo · follows BPM</option><option value="audio">Connected audio</option></select></label>
+              <p id="pixelmusicReadout" class="readout" role="status">Enable Live preview to animate.</p>
+              <div class="atari-actions">
+                <button id="pixelmusicStart" class="small-button" type="button">Go</button>
+                <button id="pixelmusicAudioSetup" class="small-button" type="button">Open audio controls</button>
+              </div>
+            </div>
+            <canvas id="pixelmusicMonitor" width="480" height="360" role="img" aria-label="Pixelmusic 3000 preview"></canvas>
+          </div>
+          <div class="grid two">
+            <label for="pmRoutine" class="field"><span>Pattern</span><select id="pmRoutine"><option value="auto">Auto · favorite patterns</option><option value="0">Stereo wings</option><option value="1">Crossed stripes</option><option value="2">Fine cross</option><option value="3">Turning stripes</option><option value="4">Diamond cross</option><option value="5">Diamond grid</option><option value="6">Polar echoes</option><option value="7">Sidechain diamonds</option></select></label>
+            <label for="pmPalette" class="field"><span>Palette</span><select id="pmPalette"><option value="auto">Auto · five colour families</option><option value="brown">Browns & yellows</option><option value="blue">Blues & purples</option><option value="pink">Pink, purple & white</option><option value="aqua">Light blues & greens</option><option value="orange">Oranges & greens</option></select></label>
+            <label for="pmGainLeft" class="field"><span>Gain · L <output id="pmGainLeftValue">100%</output></span><input id="pmGainLeft" type="range" min="0" max="200" value="100"></label>
+            <label for="pmGainRight" class="field"><span>Gain · R <output id="pmGainRightValue">100%</output></span><input id="pmGainRight" type="range" min="0" max="200" value="100"></label>
+            <label for="pmSpeed" class="field"><span>Animation speed</span><select id="pmSpeed"><option value="0.25">¼ speed</option><option value="0.5">½ speed</option><option value="1" selected>Normal speed</option><option value="2">2× speed</option><option value="4">4× speed</option></select></label>
+            <label for="pmThickness" class="field"><span>Pixel scale <output id="pmThicknessValue">2</output></span><input id="pmThickness" type="range" min="1" max="6" value="2" title="2 preserves the original audio-driven pixel widths"></label>
+          </div>
+          <div class="option-grid"><label for="pmStretch" class="check"><input id="pmStretch" type="checkbox"> Stretch to fill screen</label></div>
+          <fieldset class="control-group"><legend>Automation</legend>
+            <div class="grid two">
+              <label for="pmAutomation" class="field"><span>Change timing</span><select id="pmAutomation" aria-describedby="pmAutomationHelp"><option value="original">Original · audio-gated</option><option value="beats">Beats</option><option value="bars">Bars</option></select></label>
+              <div id="pmTimingControls" hidden><label for="pmChangeEvery" class="field"><span>Change every</span><select id="pmChangeEvery" disabled><option value="1">1</option><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option></select></label></div>
+            </div>
+            <p id="pmAutomationHelp" class="readout">Original waits for enough audio and a random delay. Beats and Bars follow BPM and change even during silence.</p>
+            <div class="pm-step-grid">
+              <label for="pmPatternHold" class="check"><input id="pmPatternHold" type="checkbox"> Hold pattern</label>
+              <button id="pmNextPattern" class="small-button" type="button">Next pattern</button>
+              <label for="pmPaletteHold" class="check"><input id="pmPaletteHold" type="checkbox"> Hold palette</label>
+              <button id="pmNextPalette" class="small-button" type="button">Next palette</button>
+            </div>
+            <p class="readout">Hold freezes automatic changes for that part. Next advances it once, including while held.</p>
+            <fieldset id="pmFavorites" class="pm-favorites" aria-describedby="pmFavoritesHelp"><legend>Patterns in Auto</legend>
+              <div class="pm-favorite-grid">
+                <label for="pmFavorite0" class="check"><input id="pmFavorite0" type="checkbox" checked> Stereo wings</label>
+                <label for="pmFavorite1" class="check"><input id="pmFavorite1" type="checkbox" checked> Crossed stripes</label>
+                <label for="pmFavorite2" class="check"><input id="pmFavorite2" type="checkbox" checked> Fine cross</label>
+                <label for="pmFavorite3" class="check"><input id="pmFavorite3" type="checkbox" checked> Turning stripes</label>
+                <label for="pmFavorite4" class="check"><input id="pmFavorite4" type="checkbox" checked> Diamond cross</label>
+                <label for="pmFavorite5" class="check"><input id="pmFavorite5" type="checkbox" checked> Diamond grid</label>
+                <label for="pmFavorite6" class="check"><input id="pmFavorite6" type="checkbox" checked> Polar echoes</label>
+                <label for="pmFavorite7" class="check"><input id="pmFavorite7" type="checkbox" checked> Sidechain diamonds</label>
+              </div>
+            </fieldset>
+            <p id="pmFavoritesHelp" class="readout">Auto chooses from the checked patterns. With none checked, it uses all eight.</p>
+          </fieldset>
+          <p class="readout atari-note">Based on Tarikh Korula’s Pixelmusic 3000 source. The original eight patterns use a 256 × 192 picture. Original automation retains the audio threshold and random waits; gain changes pixel size.</p>
+        </details>
+
+        <details id="nethackPanel" class="control-section nethack-panel" open hidden>
+          <summary>NetHack · Dungeon machine</summary>
+          <div class="atari-intro">
+            <div>
+              <p class="atari-badge">DUNGEON <span>MACHINE</span></p>
+              <p>Descend into a living dungeon. An adventurer, a loyal companion, and something waiting around the corner.</p>
+              <label for="nhInput" class="field"><span>Signal</span><select id="nhInput"><option value="demo">Demo · follows BPM</option><option value="audio">Connected audio</option></select></label>
+              <p id="nethackReadout" class="readout" role="status">The dungeon advances with the beat.</p>
+              <div class="atari-actions">
+                <button id="nethackStart" class="small-button" type="button">Go</button>
+                <button id="nethackAudioSetup" class="small-button" type="button">Open audio controls</button>
+                <button id="nethackNew" class="small-button" type="button">New dungeon</button>
+              </div>
+            </div>
+            <canvas id="nethackMonitor" width="480" height="300" role="img" aria-label="NetHack-inspired dungeon preview"></canvas>
+          </div>
+          <div class="grid three">
+            <label for="nhLayout" class="field"><span>Dungeon layout</span><select id="nhLayout"><option value="rooms">Rooms & corridors</option><option value="maze">Labyrinth</option><option value="cavern">Caverns</option></select></label>
+            <label for="nhDepth" class="field"><span>Dungeon depth</span><input id="nhDepth" type="number" min="1" max="30" step="1" value="8"></label>
+            <label for="nhView" class="field"><span>Camera</span><select id="nhView"><option value="map">Whole dungeon</option><option value="follow">Follow adventurer</option></select></label>
+          </div>
+          <div class="grid three">
+            <label for="nhSpeed" class="field"><span>Turns per beat</span><select id="nhSpeed"><option value="0.25">¼ turn</option><option value="0.5">½ turn</option><option value="1" selected>1 turn</option><option value="2">2 turns</option><option value="4">4 turns</option></select></label>
+            <label for="nhPopulation" class="field"><span>Population <output id="nhPopulationValue">55%</output></span><input id="nhPopulation" type="range" min="0" max="100" value="55"></label>
+            <label for="nhGlow" class="field"><span>Symbol glow <output id="nhGlowValue">35%</output></span><input id="nhGlow" type="range" min="0" max="100" value="35"></label>
+          </div>
+          <div class="grid two">
+            <label for="nhPalette" class="field"><span>Dungeon palette</span><select id="nhPalette"><option value="dungeon">Dungeon stone</option><option value="phosphor">Green phosphor</option><option value="amber">Amber torchlight</option><option value="ice">Frozen depths</option></select></label>
+            <label for="nhDynamics" class="field"><span>Audio dynamics <output id="nhDynamicsValue">70%</output></span><input id="nhDynamics" type="range" min="0" max="100" value="70" aria-describedby="nhAudioHelp"></label>
+          </div>
+          <div class="option-grid">
+            <label for="nhFog" class="check"><input id="nhFog" type="checkbox"> Explore through fog</label>
+          </div>
+          <p class="readout atari-note">An ASCII terminal dungeon: @ adventurer, d companion, letters for monsters, and symbols for treasure. Follow the adventurer or show the whole map.</p>
+          <p id="nhAudioHelp" class="readout atari-note">Audio dynamics responds to bass, mids, treble, and transients. Movement stays on BPM-driven turns. Seed and depth determine this NetHack-inspired dungeon.</p>
+        </details>
+
+        <details id="atariPanel" class="control-section atari-panel" open hidden>
+          <summary>Atari Video Music · C-240</summary>
+          <div class="atari-intro">
+            <div>
+              <p class="atari-badge">VIDEO MUSIC <span>1977</span></p>
+              <p>Colour in motion. Stereo sound becomes diamonds, cut-outs, and rings.</p>
+              <label for="atariInput" class="field"><span>Signal</span><select id="atariInput"><option value="demo">Demo · follows BPM</option><option value="audio">Connected audio</option></select></label>
+              <p id="atariReadout" class="readout" role="status">Silent demo signal. Enable Live preview to animate.</p>
+              <div class="atari-actions">
+                <button id="atariStart" class="small-button" type="button">Go</button>
+                <button id="atariAudioSetup" class="small-button" type="button">Open audio controls</button>
+              </div>
+            </div>
+            <canvas id="atariMonitor" width="480" height="360" role="img" aria-label="Atari Video Music preview"></canvas>
+          </div>
+          <div class="grid three">
+            <label for="atariGainLeft" class="field"><span>Gain · L <output id="atariGainLeftValue">100%</output></span><input id="atariGainLeft" type="range" min="0" max="200" value="100" title="Left channel size and sensitivity"></label>
+            <label for="atariColor" class="field"><span>Colour <output id="atariColorValue">65%</output></span><input id="atariColor" type="range" min="0" max="100" value="65" title="Shift the range of signal-driven colours"></label>
+            <label for="atariGainRight" class="field"><span>Gain · R <output id="atariGainRightValue">100%</output></span><input id="atariGainRight" type="range" min="0" max="200" value="100" title="Right channel size and sensitivity"></label>
+          </div>
+          <div class="grid two">
+            <label for="atariContourLeft" class="field"><span>Contour · L <output id="atariContourLeftValue">65%</output></span><input id="atariContourLeft" type="range" min="0" max="100" value="65" title="Higher values smooth the left channel envelope into steadier geometric edges"></label>
+            <label for="atariContourRight" class="field"><span>Contour · R <output id="atariContourRightValue">65%</output></span><input id="atariContourRight" type="range" min="0" max="100" value="65" title="Higher values smooth the right channel envelope into steadier geometric edges"></label>
+          </div>
+          <div class="grid three">
+            <label for="atariShape" class="field"><span>Shape</span><select id="atariShape"><option value="solid">Solid</option><option value="hole">Hole</option><option value="ring">Ring</option><option value="auto">Auto</option></select></label>
+            <label for="atariHorizontal" class="field"><span>Horizontal display</span><select id="atariHorizontal"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="5">5</option></select></label>
+            <label for="atariVertical" class="field"><span>Vertical display</span><select id="atariVertical"><option value="1">1</option><option value="2" selected>2</option><option value="4">4</option><option value="8">8</option></select></label>
+          </div>
+          <div id="atariAutoControls" class="grid two" hidden>
+            <label for="atariAutoRate" class="field"><span>Scan rate</span><select id="atariAutoRate"><option value="1">1 second</option><option value="2" selected>2 seconds</option><option value="4">4 seconds</option><option value="8">8 seconds</option></select></label>
+            <label for="atariAutoShape" class="field"><span>Auto scan</span><select id="atariAutoShape"><option value="all">Auto all</option><option value="solid">Solid only</option><option value="hole">Hole only</option><option value="ring">Ring only</option></select></label>
+          </div>
+          <label for="atariStretch" class="check"><input id="atariStretch" type="checkbox"> Stretch to fill screen</label>
+          <p class="readout atari-note">A browser interpretation of the original circuitry. The default display is 4:3; stretch fills the window or exported frame. Use Fullscreen to fill your monitor. Demo uses BPM; connected audio drives each channel independently.</p>
+        </details>
+
+        <details id="vm2Panel" class="control-section vm2-panel" open hidden>
+          <summary>Video Music 2 · Extended studio</summary>
+          <div class="atari-intro vm2-intro">
+            <div>
+              <p class="atari-badge">VIDEO MUSIC <span>2</span></p>
+              <p>More room to play. Shape the screen, sculpt the colour, and leave a little light behind.</p>
+              <label for="vm2Input" class="field"><span>Signal</span><select id="vm2Input"><option value="demo">Demo · follows BPM</option><option value="audio">Connected audio</option></select></label>
+              <p id="vm2Readout" class="readout" role="status">Silent demo signal. Enable Live preview to animate.</p>
+              <div class="atari-actions">
+                <button id="vm2Start" class="small-button" type="button">Go</button>
+                <button id="vm2AudioSetup" class="small-button" type="button">Open audio controls</button>
+                <button id="vm2Reset" class="small-button" type="button">Reset Video Music 2</button>
+                <button id="vm2Shuffle" class="small-button" type="button">Shuffle look</button>
+              </div>
+            </div>
+            <canvas id="vm2Monitor" width="480" height="270" role="img" aria-label="Video Music 2 preview"></canvas>
+          </div>
+          <fieldset class="vm2-group"><legend>Display & geometry</legend>
+            <div class="grid three">
+              <label for="vm2Aspect" class="field"><span>Aspect ratio</span><select id="vm2Aspect"><option value="viewport">Fill window</option><option value="16:9">16:9 · Widescreen</option><option value="21:9">21:9 · Ultrawide</option><option value="4:3">4:3 · Classic</option><option value="1:1">1:1 · Square</option><option value="9:16">9:16 · Portrait</option><option value="custom">Custom ratio</option></select></label>
+              <label for="vm2Geometry" class="field"><span>Geometry</span><select id="vm2Geometry"><option value="diamond">Diamonds</option><option value="circle">Circles</option><option value="square">Squares</option><option value="triangle">Triangles</option><option value="pentagon">Pentagons</option><option value="hexagon">Hexagons</option><option value="octagon">Octagons</option><option value="star">Five-point stars</option><option value="starburst">Eight-point stars</option><option value="cross">Crosses</option><option value="clover">Four-leaf clovers</option></select></label>
+              <label for="vm2Detail" class="field"><span>Edges</span><select id="vm2Detail"><option value="chunky">Chunky</option><option value="fine" selected>Fine steps</option><option value="smooth">Smooth</option></select></label>
+            </div>
+            <div id="vm2CustomAspect" class="grid two" hidden>
+              <label for="vm2AspectWidth" class="field"><span>Ratio width</span><input id="vm2AspectWidth" type="number" min="1" max="32" step="0.01" value="16"></label>
+              <label for="vm2AspectHeight" class="field"><span>Ratio height</span><input id="vm2AspectHeight" type="number" min="1" max="32" step="0.01" value="9"></label>
+            </div>
+            <div class="grid three">
+              <label for="vm2Shape" class="field"><span>Shape logic</span><select id="vm2Shape"><option value="solid">Solid</option><option value="hole">Hole</option><option value="ring">Ring</option><option value="auto">Auto</option></select></label>
+              <label for="vm2Columns" class="field"><span>Columns</span><input id="vm2Columns" type="number" min="1" max="8" step="1" value="3"></label>
+              <label for="vm2Rows" class="field"><span>Rows</span><input id="vm2Rows" type="number" min="1" max="8" step="1" value="2"></label>
+            </div>
+            <div id="vm2AutoControls" class="grid two" hidden>
+              <label for="vm2AutoRate" class="field"><span>Scan rate</span><select id="vm2AutoRate"><option value="1">1 second</option><option value="2" selected>2 seconds</option><option value="4">4 seconds</option><option value="8">8 seconds</option></select></label>
+              <label for="vm2AutoShape" class="field"><span>Auto scan</span><select id="vm2AutoShape"><option value="all">Auto all</option><option value="solid">Solid only</option><option value="hole">Hole only</option><option value="ring">Ring only</option></select></label>
+            </div>
+          </fieldset>
+          <fieldset class="vm2-group"><legend>Stereo response</legend>
+            <div class="grid two">
+              <label for="vm2GainLeft" class="field"><span>Gain · L <output id="vm2GainLeftValue">100%</output></span><input id="vm2GainLeft" type="range" min="0" max="200" value="100"></label>
+              <label for="vm2GainRight" class="field"><span>Gain · R <output id="vm2GainRightValue">85%</output></span><input id="vm2GainRight" type="range" min="0" max="200" value="85"></label>
+              <label for="vm2ContourLeft" class="field"><span>Contour · L <output id="vm2ContourLeftValue">65%</output></span><input id="vm2ContourLeft" type="range" min="0" max="100" value="65" title="Higher values smooth the channel into steadier shapes"></label>
+              <label for="vm2ContourRight" class="field"><span>Contour · R <output id="vm2ContourRightValue">65%</output></span><input id="vm2ContourRight" type="range" min="0" max="100" value="65" title="Higher values smooth the channel into steadier shapes"></label>
+            </div>
+          </fieldset>
+          <fieldset class="vm2-group"><legend>Colour & light</legend>
+            <div class="grid three">
+              <label for="vm2Palette" class="field"><span>Palette</span><select id="vm2Palette"><option value="spectral">Spectral</option><option value="neon" selected>Neon</option><option value="sunset">Sunset</option><option value="ice">Ice</option><option value="phosphor">Phosphor</option><option value="mono">Monochrome</option></select></label>
+              <label for="vm2Color" class="field"><span>Colour response <output id="vm2ColorValue">65%</output></span><input id="vm2Color" type="range" min="0" max="100" value="65" title="Sets the range of colours driven by the audio frequency"></label>
+              <label for="vm2Hue" class="field"><span>Hue shift <output id="vm2HueValue">0°</output></span><input id="vm2Hue" type="range" min="0" max="360" value="0"></label>
+              <label for="vm2Saturation" class="field"><span>Saturation <output id="vm2SaturationValue">90%</output></span><input id="vm2Saturation" type="range" min="0" max="100" value="90"></label>
+              <label for="vm2Glow" class="field"><span>Glow <output id="vm2GlowValue">35%</output></span><input id="vm2Glow" type="range" min="0" max="100" value="35"></label>
+              <label for="vm2Trails" class="field"><span>Trails <output id="vm2TrailsValue">0%</output></span><input id="vm2Trails" type="range" min="0" max="100" value="0" title="Keeps a short fading history of the picture. Enable Live preview or playback to see trails."></label>
+            </div>
+          </fieldset>
+          <fieldset class="vm2-group"><legend>Symmetry & motion</legend>
+            <div class="grid two">
+              <label for="vm2Symmetry" class="field"><span>Mirror</span><select id="vm2Symmetry"><option value="none">None</option><option value="horizontal">Left / right</option><option value="vertical">Top / bottom</option><option value="quad">Four ways</option></select></label>
+              <label for="vm2Zoom" class="field"><span>Zoom <output id="vm2ZoomValue">100%</output></span><input id="vm2Zoom" type="range" min="50" max="200" value="100"></label>
+              <label for="vm2Rotation" class="field"><span>Rotation <output id="vm2RotationValue">0°</output></span><input id="vm2Rotation" type="range" min="-180" max="180" value="0"></label>
+              <label for="vm2Spin" class="field"><span>Spin <output id="vm2SpinValue">0°/s</output></span><input id="vm2Spin" type="range" min="-60" max="60" value="0"></label>
+            </div>
+          </fieldset>
+          <p class="readout atari-note">Fill window adapts to any screen. Fixed ratios fit inside the screen or exported frame. All Video Music 2 settings save with your scene; the original Atari controls stay separate.</p>
+        </details>
+
+        <details class="control-section text-section" data-tools="text" open>
           <summary>Text</summary>
-          <label class="field">
+          <label for="lyrics" class="field">
             <span>Lyrics / Words</span>
             <textarea id="lyrics" maxlength="60000" spellcheck="false">pulse
 through
@@ -38,18 +253,18 @@ echo
 light</textarea>
           </label>
           <div class="option-grid">
-          <label class="check"><input id="splitWords" type="checkbox" checked> Split pasted lyrics into words</label>
+          <label for="splitWords" class="check"><input id="splitWords" type="checkbox" checked> Split pasted lyrics into words</label>
           </div>
         </details>
 
-        <details class="mask-panel control-section">
+        <details class="mask-panel control-section" data-tools="text">
           <summary>ASCII Mask / Stencil</summary>
-          <label class="field">
+          <label for="maskArt" class="field">
             <span>Mask Art</span>
             <textarea id="maskArt" maxlength="60000" spellcheck="false" placeholder="Paste ASCII art here. Non-space characters become the mask."></textarea>
           </label>
           <div class="grid three">
-            <label class="field">
+            <label for="maskMode" class="field">
               <span>Mask Mode</span>
               <select id="maskMode">
                 <option value="off">Off</option>
@@ -58,7 +273,7 @@ light</textarea>
                 <option value="texture">Use pasted characters</option>
               </select>
             </label>
-            <label class="field">
+            <label for="maskLayer" class="field">
               <span>Mask Layer</span>
               <select id="maskLayer">
                 <option value="behind">Behind words</option>
@@ -66,7 +281,7 @@ light</textarea>
                 <option value="replace">Replace words</option>
               </select>
             </label>
-            <label class="field">
+            <label for="maskScale" class="field">
               <span>Mask Scale <output id="maskScaleValue">1</output></span>
               <input id="maskScale" type="range" min="1" max="8" value="1">
             </label>
@@ -76,18 +291,18 @@ light</textarea>
         <details class="control-section" open>
           <summary>Core</summary>
           <div class="grid three">
-          <label class="field">
+          <label for="seed" class="field">
             <span>Seed</span>
             <div class="inline-control">
               <input id="seed" type="text" maxlength="512" value="signal-808" autocomplete="off">
               <button id="randomizeSeed" class="icon-button" type="button" title="Randomize seed" aria-label="Randomize seed">&#8635;</button>
             </div>
           </label>
-          <label class="field">
+          <label for="bpm" class="field">
             <span>BPM</span>
             <input id="bpm" type="number" min="20" max="360" step="1" value="128">
           </label>
-          <label class="field">
+          <label for="colorMode" data-tools="text" class="field">
             <span>Colour Mode</span>
             <select id="colorMode">
               <option value="classic">Classic glow</option>
@@ -98,14 +313,14 @@ light</textarea>
           </label>
           </div>
           <div class="option-grid">
-          <label class="check"><input id="lockSeed" type="checkbox"> Lock seed when randomizing</label>
+          <label for="lockSeed" class="check"><input id="lockSeed" type="checkbox"> Lock seed when randomizing</label>
           </div>
         </details>
 
-        <details class="control-section" open>
+        <details class="control-section" data-tools="text" open>
           <summary>Visual Texture</summary>
           <div class="grid three">
-          <label class="field">
+          <label for="backgroundMode" class="field">
             <span>Background Engine</span>
             <select id="backgroundMode">
               <option value="ray">Ray field</option>
@@ -120,7 +335,7 @@ light</textarea>
               <option value="blocks">Data blocks</option>
             </select>
           </label>
-          <label class="field">
+          <label for="charsetPreset" class="field">
             <span>Character Set</span>
             <select id="charsetPreset">
               <option value="full">Full ramp</option>
@@ -134,21 +349,30 @@ light</textarea>
               <option value="custom">Custom</option>
             </select>
           </label>
-          <label class="field">
+          <label for="customCharset" class="field">
             <span>Custom Characters</span>
             <input id="customCharset" type="text" maxlength="256" value="@%#*+=-:. " autocomplete="off">
           </label>
           </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>Display</summary>
           <div class="option-grid">
-          <label class="check"><input id="invert" type="checkbox"> Invert</label>
-          <label class="check"><input id="scanlines" type="checkbox" checked> Scanlines</label>
+            <label for="invert" class="check"><input id="invert" type="checkbox"> Invert</label>
+            <label for="scanlines" class="check"><input id="scanlines" type="checkbox" checked> Scanlines</label>
+          </div>
+          <div id="scanlineControls" class="grid three">
+            <label for="scanlineStrength" class="field"><span>Strength <output id="scanlineStrengthValue">8%</output></span><input id="scanlineStrength" type="range" min="0" max="40" value="8" title="Brightness of the scanline overlay"></label>
+            <label for="scanlineSpacing" class="field"><span>Spacing <output id="scanlineSpacingValue">4 px</output></span><input id="scanlineSpacing" type="range" min="2" max="12" value="4" title="Distance between scanlines in screen or export pixels"></label>
+            <label for="scanlineThickness" class="field"><span>Thickness <output id="scanlineThicknessValue">25%</output></span><input id="scanlineThickness" type="range" min="10" max="75" value="25" title="Percentage of each spacing covered by a scanline"></label>
           </div>
         </details>
 
         <details class="control-section" open>
           <summary>Timing</summary>
-          <div class="grid three">
-          <label class="field">
+          <div class="grid three" data-tools="text">
+          <label for="beatRate" data-tools="text" class="field">
             <span>Beat Timing</span>
             <select id="beatRate">
               <option value="1">Every beat</option>
@@ -160,7 +384,7 @@ light</textarea>
               <option value="8">Hold 8 beats</option>
             </select>
           </label>
-          <label class="field">
+          <label for="wordMotion" data-tools="text" class="field">
             <span>Word Motion</span>
             <select id="wordMotion">
               <option value="pulse">Center pulse</option>
@@ -171,7 +395,7 @@ light</textarea>
               <option value="stack">Strobe stack</option>
             </select>
           </label>
-          <label class="field">
+          <label for="palette" data-tools="text" class="field">
             <span>Palette</span>
             <select id="palette">
               <option value="cyber">Cyber neon</option>
@@ -181,11 +405,19 @@ light</textarea>
               <option value="commodore">Commodore 64</option>
               <option value="dos">DOS blue</option>
               <option value="vga">High contrast VGA</option>
+              <option value="sunset">Sunset</option>
+              <option value="ocean">Deep ocean</option>
+              <option value="synthwave">Synthwave</option>
+              <option value="aurora">Aurora</option>
+              <option value="rose">Rose quartz</option>
+              <option value="ice">Arctic ice</option>
+              <option value="ember">Ember</option>
+              <option value="mono">Monochrome</option>
             </select>
           </label>
           </div>
           <div class="grid three">
-          <label class="field">
+          <label for="barLength" class="field">
             <span>Bar Length</span>
             <select id="barLength">
               <option value="4">4 beats</option>
@@ -196,11 +428,11 @@ light</textarea>
               <option value="8">8 beats</option>
             </select>
           </label>
-          <label class="field">
+          <label for="sectionBars" data-tools="text" class="field">
             <span>Section Bars</span>
             <input id="sectionBars" type="number" min="1" max="32" step="1" value="8">
           </label>
-          <label class="field">
+          <label for="transitionMode" class="field">
             <span>Transition</span>
             <select id="transitionMode">
               <option value="cut">Cut now</option>
@@ -211,17 +443,55 @@ light</textarea>
           </label>
           </div>
           <div class="option-grid">
-          <label class="check"><input id="beatFlash" type="checkbox" checked> Beat flash</label>
-          <label class="check"><input id="downbeatFlash" type="checkbox"> Downbeat flash only</label>
-          <label class="check"><input id="midiSync" type="checkbox"> MIDI tempo sync</label>
-          <label class="check"><input id="autoSections" type="checkbox"> Auto sections</label>
+          <label for="beatFlash" data-tools="text" class="check"><input id="beatFlash" type="checkbox" checked> Beat flash</label>
+          <label for="downbeatFlash" data-tools="text" class="check"><input id="downbeatFlash" type="checkbox"> Downbeat flash only</label>
+          <label for="midiSync" class="check"><input id="midiSync" type="checkbox"> MIDI tempo sync</label>
+          <label for="autoSections" data-tools="text" class="check"><input id="autoSections" type="checkbox"> Auto sections</label>
           </div>
+        </details>
+
+        <details id="audioPanel" class="control-section">
+          <summary>Audio Reactive</summary>
+          <div class="grid three">
+            <label for="audioSource" class="field"><span>Audio source</span><select id="audioSource"><option value="microphone">Microphone / audio input</option><option value="screen">Shared tab / system audio</option></select></label>
+            <label for="audioSensitivity" class="field"><span>Sensitivity <output id="audioSensitivityValue">4</output></span><input id="audioSensitivity" type="range" min="1" max="10" value="4"></label>
+            <label for="audioResponse" class="field"><span>Response</span><select id="audioResponse" aria-describedby="audioResponseHelp"><option value="full">Full signal</option><option value="bass">Bass</option><option value="mid">Mids</option><option value="treble">Treble</option><option value="transient">Transients</option></select></label>
+          </div>
+          <p id="audioResponseHelp" class="readout">Choose the part of the sound that drives this scene. Movement and word timing still follow BPM.</p>
+          <fieldset class="control-group"><legend>Input response</legend>
+            <div class="grid three">
+              <label for="audioAttack" class="field"><span>Attack <output id="audioAttackValue">20 ms</output></span><input id="audioAttack" type="range" min="1" max="250" step="1" value="20" aria-describedby="audioEnvelopeHelp"></label>
+              <label for="audioRelease" class="field"><span>Release <output id="audioReleaseValue">120 ms</output></span><input id="audioRelease" type="range" min="20" max="2000" step="10" value="120" aria-describedby="audioEnvelopeHelp"></label>
+              <label for="audioGate" class="field"><span>Noise gate <output id="audioGateValue">−42 dBFS</output></span><input id="audioGate" type="range" min="-70" max="-10" step="1" value="-42" aria-describedby="audioEnvelopeHelp"></label>
+            </div>
+            <p id="audioEnvelopeHelp" class="readout">Attack sets how quickly the picture responds; release sets how slowly it settles. The gate suppresses quiet input below its threshold.</p>
+          </fieldset>
+          <div class="scene-actions">
+            <button id="connectAudio" class="small-button" type="button">Connect audio</button>
+            <button id="disconnectAudio" class="small-button" type="button" disabled>Disconnect</button>
+            <meter id="audioMeter" min="0" max="1" value="0" aria-label="Audio level"></meter>
+            <output id="audioReadout" class="readout" role="status">Audio off</output>
+          </div>
+          <div class="audio-stereo-meters" role="group" aria-label="Stereo input levels">
+            <div class="audio-channel">
+              <div class="audio-channel-title"><label for="audioLevelLeft">Left</label><output id="audioClipLeft" class="audio-clip" aria-label="Left channel clipping" aria-live="off">Clear</output></div>
+              <meter id="audioLevelLeft" min="0" max="1" value="0" aria-describedby="audioMeterHelp"></meter>
+            </div>
+            <div class="audio-channel">
+              <div class="audio-channel-title"><label for="audioLevelRight">Right</label><output id="audioClipRight" class="audio-clip" aria-label="Right channel clipping" aria-live="off">Clear</output></div>
+              <meter id="audioLevelRight" min="0" max="1" value="0" aria-describedby="audioMeterHelp"></meter>
+            </div>
+          </div>
+          <p id="audioMeterHelp" class="readout">Meters show the smoothed signal after the gate. Clip indicators show peaks in the incoming audio; lower the source volume if they stay lit.</p>
+          <p class="readout" data-tools="text">Audio adds pulse and texture intensity; BPM still controls word timing.</p>
+          <p id="audioModeHelp" class="readout" data-tools="video" hidden>Select Connected audio in the synthesizer to drive shapes and colours from the left and right channels.</p>
+          <p class="readout">For shared audio, enable Share audio in the browser picker. Audio stays local and is not played back.</p>
         </details>
 
         <details class="control-section">
           <summary>Performance</summary>
           <div class="grid three">
-          <label class="field">
+          <label for="quality" data-tools="text" class="field">
             <span>Quality</span>
             <select id="quality">
               <option value="medium">Medium</option>
@@ -230,7 +500,7 @@ light</textarea>
               <option value="ultra">Ultra</option>
             </select>
           </label>
-          <label class="field">
+          <label for="fpsCap" class="field">
             <span>FPS Limit</span>
             <select id="fpsCap">
               <option value="auto">Auto</option>
@@ -242,7 +512,7 @@ light</textarea>
               <option value="0">Uncapped</option>
             </select>
           </label>
-          <label class="field">
+          <label for="lyricMode" data-tools="text" class="field">
             <span>Lyric Mode</span>
             <select id="lyricMode">
               <option value="words">Words</option>
@@ -250,7 +520,7 @@ light</textarea>
               <option value="markup">Markup words</option>
             </select>
           </label>
-          <label class="field">
+          <label for="captureSize" class="field">
             <span>Capture Size</span>
             <select id="captureSize">
               <option value="window">Window</option>
@@ -262,35 +532,35 @@ light</textarea>
           </label>
           </div>
           <div class="option-grid">
-          <label class="check"><input id="recordingMode" type="checkbox"> Recording mode</label>
-          <label class="check"><input id="stageBeatIndicator" type="checkbox"> Stage beat indicator</label>
-          <label class="check"><input id="fullscreenOnStart" type="checkbox"> Fullscreen on Go</label>
+          <label for="recordingMode" class="check"><input id="recordingMode" type="checkbox"> Recording mode</label>
+          <label for="stageBeatIndicator" class="check"><input id="stageBeatIndicator" type="checkbox"> Stage beat indicator</label>
+          <label for="fullscreenOnStart" class="check"><input id="fullscreenOnStart" type="checkbox"> Fullscreen on Go</label>
           </div>
         </details>
 
-        <details class="control-section" open>
+        <details class="control-section" data-tools="text" open>
           <summary>Intensity</summary>
           <div class="grid three">
-          <label class="field">
+          <label for="glyphSize" class="field">
             <span>Glyph Size <output id="glyphSizeValue">13</output></span>
             <input id="glyphSize" type="range" min="8" max="24" value="13">
           </label>
-          <label class="field">
+          <label for="density" class="field">
             <span>Word Density <output id="densityValue">4</output></span>
             <input id="density" type="range" min="1" max="8" value="4">
           </label>
-          <label class="field">
+          <label for="glitch" class="field">
             <span>Glitch <output id="glitchValue">0</output></span>
             <input id="glitch" type="range" min="0" max="100" value="0">
           </label>
           </div>
 
           <div class="grid two">
-          <label class="field">
+          <label for="haloSize" class="field">
             <span>Word Halo Size <output id="haloSizeValue">0</output></span>
             <input id="haloSize" type="range" min="0" max="24" value="0">
           </label>
-          <label class="field">
+          <label for="legibilityMode" class="field">
             <span>Legibility</span>
             <select id="legibilityMode">
               <option value="balanced">Balanced</option>
@@ -300,8 +570,8 @@ light</textarea>
           </label>
           </div>
           <div class="option-grid">
-          <label class="check"><input id="wordHalo" type="checkbox"> Word halo</label>
-          <label class="check"><input id="backgroundOnly" type="checkbox"> Background only</label>
+          <label for="wordHalo" class="check"><input id="wordHalo" type="checkbox"> Word halo</label>
+          <label for="backgroundOnly" class="check"><input id="backgroundOnly" type="checkbox"> Background only</label>
           </div>
         </details>
 
@@ -313,7 +583,7 @@ light</textarea>
           <button id="copyShareUrl" class="small-button" type="button">Copy share URL</button>
           <button id="copyObsUrl" class="small-button" type="button">Copy OBS URL</button>
           <button id="saveFrame" class="small-button" type="button">Save frame</button>
-          <button id="panicButton" class="small-button hot" type="button">Panic look</button>
+          <button id="panicButton" class="small-button hot" data-tools="text" type="button">Panic look</button>
           <button id="connectMidi" class="small-button" type="button">Connect MIDI</button>
           <select id="midiInput" aria-label="MIDI input">
             <option value="">No MIDI input</option>
@@ -326,6 +596,30 @@ light</textarea>
 
         <details class="control-section" open>
           <summary>Scenes & Presets</summary>
+          <div class="grid two">
+            <label for="sceneName" class="field"><span>Scene name</span><input id="sceneName" type="text" maxlength="80" placeholder="e.g. Quiet intro" autocomplete="off"></label>
+            <div class="scene-actions"><output id="sceneDirty" class="readout" role="status">Not saved</output><button id="revertScene" class="small-button" type="button">Revert to saved</button></div>
+          </div>
+          <div class="option-grid" aria-label="Global scene locks">
+            <label for="lockTempo" class="check"><input id="lockTempo" type="checkbox"> Lock tempo</label>
+            <label for="lockLyrics" class="check" data-tools="text"><input id="lockLyrics" type="checkbox"> Lock lyrics</label>
+            <label for="lockPalette" class="check"><input id="lockPalette" type="checkbox"> Lock palette</label>
+            <label for="lockPerformance" class="check"><input id="lockPerformance" type="checkbox"> Lock performance</label>
+          </div>
+          <p class="readout">Locks preserve current controls when recalling scenes or applying looks. Imports still save the complete imported settings.</p>
+          <div class="grid two">
+            <label for="sceneEffect" class="field"><span>Slide effect</span><select id="sceneEffect"><option value="none">None</option><option value="crossfade">Crossfade</option><option value="wipe">Wipe left</option><option value="slide">Slide left</option><option value="zoom">Zoom dissolve</option></select></label>
+            <label for="sceneDuration" class="field"><span>Effect duration (seconds)</span><input id="sceneDuration" type="number" min="0.1" max="5" step="0.1" value="0.8"></label>
+          </div>
+          <p class="readout">Transition timing still follows Cut / Next beat / Next bar. Effects blend the outgoing frame into the new scene.</p>
+          <div class="grid two">
+            <label for="intervalMode" class="check"><input id="intervalMode" type="checkbox"> Interval Mode</label>
+            <label for="intervalMinutes" class="field">
+              <span>Scene interval (minutes)</span>
+              <input id="intervalMinutes" type="number" min="0.1" max="1440" step="0.1" value="1">
+            </label>
+          </div>
+          <p class="readout">Go starts at the selected saved scene, then cycles in slot order, skipping empty slots and looping. Pausing pauses the interval.</p>
           <div id="sceneSlots" class="scene-slots" aria-label="Scene slots">
           <button class="small-button scene-button empty" type="button" data-slot="1">Slot 1</button>
           <button class="small-button scene-button empty" type="button" data-slot="2">Slot 2</button>
@@ -339,10 +633,10 @@ light</textarea>
           <div class="scene-actions">
           <button id="storeScene" class="small-button" type="button">Store scene</button>
           <button id="clearScenes" class="small-button" type="button">Clear scenes</button>
-          <output id="sceneReadout" class="readout">Scene slots ready</output>
+          <output id="sceneReadout" class="readout" role="status">Scene slots ready</output>
           </div>
           <div class="preset-bank" aria-label="Default scene presets">
-          <label class="field">
+          <label for="defaultScenePreset" class="field">
             <span>Default Scene</span>
             <select id="defaultScenePreset">
               <option value="lyricPrism">Lyric prism</option>
@@ -361,6 +655,12 @@ light</textarea>
               <option value="wireTerrain">Wire terrain</option>
               <option value="scopeTrace">Scope trace</option>
               <option value="dataBlocks">Data blocks</option>
+              <option value="atariVideoMusic">Atari Video Music</option>
+              <option value="videoMusic2">Video Music 2 · Neon wide</option>
+              <option value="vm2Phosphor">Video Music 2 · Phosphor trails</option>
+              <option value="vm2Portrait">Video Music 2 · Portrait rings</option>
+              <option value="nethackVideo">NetHack · ASCII terminal</option>
+              <option value="pixelmusic3000">Pixelmusic 3000</option>
             </select>
           </label>
           <button id="applyDefaultScene" class="small-button preset-button" type="button">Apply default</button>
@@ -372,7 +672,7 @@ light</textarea>
           <button id="randomizeTiming" class="small-button" type="button">Randomize timing</button>
           </div>
           <div class="preset-panel">
-          <label class="field">
+          <label for="presetData" class="field">
             <span>Scene JSON</span>
             <textarea id="presetData" maxlength="2400000" spellcheck="false" placeholder="Export or paste scene JSON here"></textarea>
           </label>
@@ -381,6 +681,8 @@ light</textarea>
             <button id="loadPreset" class="small-button" type="button">Import scene</button>
             <button id="copySceneBank" class="small-button" type="button">Export all scenes</button>
             <button id="loadSceneBank" class="small-button" type="button">Import all scenes</button>
+            <button id="importSceneFile" class="small-button" type="button">Import JSON file</button>
+            <input id="sceneFile" type="file" accept=".json,application/json" hidden>
             <button id="randomizeAll" class="small-button hot" type="button">Randomize all</button>
           </div>
           </div>
@@ -390,12 +692,12 @@ light</textarea>
           <span><kbd>Esc</kbd> menu</span>
           <span><kbd>Space</kbd> pause</span>
           <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> BPM</span>
-          <span><kbd>B</kbd> background</span>
-          <span><kbd>H</kbd> halo</span>
+          <span data-tools="text"><kbd>B</kbd> background</span>
+          <span data-tools="text"><kbd>H</kbd> halo</span>
           <span><kbd>I</kbd> invert</span>
           <span><kbd>S</kbd> scanlines</span>
-          <span><kbd>M</kbd> motion</span>
-          <span><kbd>0</kbd> panic</span>
+          <span data-tools="text"><kbd>M</kbd> motion</span>
+          <span data-tools="text"><kbd>0</kbd> panic</span>
           <span><kbd>1-8</kbd> scenes</span>
         </div>
 
@@ -403,9 +705,13 @@ light</textarea>
       </section>
     </main>
 
-    <section id="stage" class="stage" aria-label="ASCII art playback" hidden>
+    <section id="stage" class="stage" aria-label="Visualizer playback" tabindex="-1" hidden>
       <canvas id="asciiCanvas" aria-hidden="true"></canvas>
       <pre id="ascii" aria-live="off"></pre>
+      <nav id="stageControls" class="stage-controls" aria-label="Playback controls">
+        <button id="stageMenu" class="small-button" type="button">Menu</button>
+        <button id="stagePause" class="small-button" type="button" aria-pressed="false">Pause</button>
+      </nav>
       <div id="stageHud" class="stage-hud" hidden>
         <span id="beatDot" class="beat-dot"></span>
         <span id="stageInfo">128 BPM</span>
@@ -413,6 +719,21 @@ light</textarea>
       <div id="beat" class="beat"></div>
     </section>
 
+    <script src="js/atari-video-music.js"></script>
+    <script src="js/video-music-2.js"></script>
+    <script src="js/nethack-visualizer.js"></script>
+    <script src="js/pixelmusic-3000.js"></script>
+    <!-- Ordered classic modules retain direct file:// startup without a build step. -->
+    <script src="js/app-data.js"></script>
+    <script src="js/app-state.js"></script>
+    <script src="js/app-core.js"></script>
+    <script src="js/app-text.js"></script>
+    <script src="js/app-render.js"></script>
+    <script src="js/app-scenes.js"></script>
+    <script src="js/app-transport.js"></script>
+    <script src="js/app-export.js"></script>
+    <script src="js/app-audio.js"></script>
+    <script src="js/app-ui.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
