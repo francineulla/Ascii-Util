@@ -2,29 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; media-src blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ASCII BPM Cycler</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <section id="previewPanel" class="preview-panel" aria-label="Live preview">
-      <canvas id="previewCanvas" aria-hidden="true"></canvas>
-      <pre id="previewAscii" aria-live="off"></pre>
-    </section>
-
     <main id="menu" class="menu-shell">
-      <section class="control-panel" aria-label="ASCII BPM Cycler controls">
-        <div class="title-row">
-          <div>
+        <header class="title-row">
+          <div class="toolbar-main">
+          <div class="studio-title">
             <p class="kicker">ASCII BPM Cycler</p>
+            <h1>Visual studio</h1>
           </div>
-          <div class="preview-meta">
-            <span id="previewReadout">Preview ready</span>
-            <label for="livePreview" class="preview-toggle"><input id="livePreview" type="checkbox"> Live preview</label>
-            <button id="refreshPreview" class="small-button" type="button">Refresh preview</button>
-          </div>
-        </div>
-
         <section class="visualizer-picker" aria-label="Render mode">
           <label for="toolMode" class="field">
             <span>Render mode</span>
@@ -43,8 +33,52 @@
               <option value="pixelmusic">Pixelmusic 3000</option>
             </select>
           </label>
-          <p class="readout">Choose a mode, adjust its controls, then press Go. Your settings stay in place when you switch.</p>
+          <label for="bpm" class="field toolbar-tempo">
+            <span>BPM</span>
+            <input id="bpm" type="number" min="20" max="360" step="1" value="128">
+          </label>
         </section>
+          <button id="start" class="start-button" type="button">Go <span aria-hidden="true">↗</span></button>
+          </div>
+          <div class="toolbar-secondary">
+            <div class="preview-meta">
+              <span id="previewReadout">Preview ready</span>
+              <label for="livePreview" class="preview-toggle"><input id="livePreview" type="checkbox"> Live preview</label>
+              <button id="refreshPreview" class="small-button" type="button">Refresh preview</button>
+            </div>
+            <div class="history-actions" aria-label="Edit history">
+              <button id="undoEdit" class="small-button secondary-button" type="button" disabled title="Undo · Ctrl/⌘ Z">Undo</button>
+              <button id="redoEdit" class="small-button secondary-button" type="button" disabled title="Redo · Ctrl/⌘ Shift Z">Redo</button>
+            </div>
+          </div>
+          <div class="recovery-status">
+            <output id="historyReadout" role="status">No edits yet</output>
+            <output id="draftReadout" role="status">Draft ready</output>
+          </div>
+        </header>
+
+      <div class="workspace-grid">
+        <aside class="preview-workbench" aria-label="Output monitor">
+          <div class="monitor-heading"><span>Output preview</span><span id="workspaceScene">Unsaved look</span></div>
+          <section id="previewPanel" class="preview-panel" aria-label="Live preview">
+            <canvas id="previewCanvas" aria-hidden="true"></canvas>
+            <pre id="previewAscii" aria-live="off"></pre>
+          </section>
+          <p class="monitor-caption">Adjust your look here. <strong>Go</strong> opens playback; <kbd>Esc</kbd> returns to the studio.</p>
+        </aside>
+
+      <section class="control-panel" aria-label="ASCII BPM Cycler controls">
+        <details id="galleryPanel" class="control-section gallery-panel" open>
+          <summary>Looks &amp; scenes</summary>
+          <div class="gallery-heading">
+            <p>Start with a look, then make it yours.</p>
+            <label for="galleryFilter" class="field"><span>Show looks</span><select id="galleryFilter"><option value="current">Current mode</option><option value="all">All modes</option></select></label>
+          </div>
+          <div id="presetGallery" class="look-gallery" aria-label="Built-in looks"></div>
+          <p class="gallery-label">Your saved scenes</p>
+          <div id="sceneGallery" class="look-gallery scene-gallery" aria-label="Saved scenes"></div>
+          <output id="galleryReadout" class="gallery-help" role="status">Choose a look to preview it. Store scene saves your changes to a slot.</output>
+        </details>
 
         <details id="pixelmusicPanel" class="control-section pixelmusic-panel" open hidden>
           <summary>Pixelmusic 3000</summary>
@@ -298,10 +332,6 @@ light</textarea>
               <button id="randomizeSeed" class="icon-button" type="button" title="Randomize seed" aria-label="Randomize seed">&#8635;</button>
             </div>
           </label>
-          <label for="bpm" class="field">
-            <span>BPM</span>
-            <input id="bpm" type="number" min="20" max="360" step="1" value="128">
-          </label>
           <label for="colorMode" data-tools="text" class="field">
             <span>Colour Mode</span>
             <select id="colorMode">
@@ -452,6 +482,11 @@ light</textarea>
 
         <details id="audioPanel" class="control-section">
           <summary>Audio Reactive</summary>
+          <div class="audio-device-row">
+            <label for="audioDevice" class="field"><span>Audio input device</span><select id="audioDevice" aria-describedby="audioDeviceHelp"><option value="">System default</option></select></label>
+            <button id="refreshAudioDevices" class="small-button secondary-button" type="button">Refresh inputs</button>
+          </div>
+          <p id="audioDeviceHelp" class="readout">Connect audio to allow device names. Selecting an input never opens a connection.</p>
           <div class="grid three">
             <label for="audioSource" class="field"><span>Audio source</span><select id="audioSource"><option value="microphone">Microphone / audio input</option><option value="screen">Shared tab / system audio</option></select></label>
             <label for="audioSensitivity" class="field"><span>Sensitivity <output id="audioSensitivityValue">4</output></span><input id="audioSensitivity" type="range" min="1" max="10" value="4"></label>
@@ -469,6 +504,7 @@ light</textarea>
           <div class="scene-actions">
             <button id="connectAudio" class="small-button" type="button">Connect audio</button>
             <button id="disconnectAudio" class="small-button" type="button" disabled>Disconnect</button>
+            <button id="resumeAudio" class="small-button" type="button" hidden>Resume audio</button>
             <meter id="audioMeter" min="0" max="1" value="0" aria-label="Audio level"></meter>
             <output id="audioReadout" class="readout" role="status">Audio off</output>
           </div>
@@ -483,6 +519,16 @@ light</textarea>
             </div>
           </div>
           <p id="audioMeterHelp" class="readout">Meters show the smoothed signal after the gate. Clip indicators show peaks in the incoming audio; lower the source volume if they stay lit.</p>
+          <section id="audioCalibration" class="audio-calibration" aria-label="Input calibration">
+            <h2>Set up your signal</h2>
+            <div class="audio-stereo-meters">
+              <div class="audio-channel"><div class="audio-channel-title"><label for="audioRawLeft">Raw left input</label><output id="audioRawLeftValue">−70 dBFS</output></div><meter id="audioRawLeft" min="-70" max="0" value="-70"></meter></div>
+              <div class="audio-channel"><div class="audio-channel-title"><label for="audioRawRight">Raw right input</label><output id="audioRawRightValue">−70 dBFS</output></div><meter id="audioRawRight" min="-70" max="0" value="-70"></meter></div>
+            </div>
+            <p>Connect your input, then leave it quiet for two seconds to measure the noise floor. Play your loudest passage and adjust sensitivity until the picture responds without staying at maximum. If the clip lights stay on, lower the source volume.</p>
+            <button id="calibrateAudio" class="small-button secondary-button" type="button" disabled>Measure noise floor</button>
+            <output id="audioCalibrationReadout" class="readout" role="status">Connect audio to calibrate your input.</output>
+          </section>
           <p class="readout" data-tools="text">Audio adds pulse and texture intensity; BPM still controls word timing.</p>
           <p id="audioModeHelp" class="readout" data-tools="video" hidden>Select Connected audio in the synthesizer to drive shapes and colours from the left and right channels.</p>
           <p class="readout">For shared audio, enable Share audio in the browser picker. Audio stays local and is not played back.</p>
@@ -535,7 +581,10 @@ light</textarea>
           <label for="recordingMode" class="check"><input id="recordingMode" type="checkbox"> Recording mode</label>
           <label for="stageBeatIndicator" class="check"><input id="stageBeatIndicator" type="checkbox"> Stage beat indicator</label>
           <label for="fullscreenOnStart" class="check"><input id="fullscreenOnStart" type="checkbox"> Fullscreen on Go</label>
+          <label for="keepAwake" class="check"><input id="keepAwake" type="checkbox" checked> Keep screen awake during playback</label>
           </div>
+          <output id="liveReadout" class="readout" role="status">Screen protection ready</output>
+          <p class="readout">Large displays use bounded rendering memory. Screen protection depends on browser support and system settings.</p>
         </details>
 
         <details class="control-section" data-tools="text" open>
@@ -683,6 +732,10 @@ light</textarea>
             <button id="loadSceneBank" class="small-button" type="button">Import all scenes</button>
             <button id="importSceneFile" class="small-button" type="button">Import JSON file</button>
             <input id="sceneFile" type="file" accept=".json,application/json" hidden>
+            <button id="pickPresetFolder" class="small-button" type="button">Choose presets folder</button>
+            <select id="presetFolderFiles" aria-label="JSON files in presets folder" disabled></select>
+            <button id="loadFolderPreset" class="small-button" type="button" disabled>Load from folder</button>
+            <button id="saveFolderPreset" class="small-button" type="button" disabled>Save to folder</button>
             <button id="randomizeAll" class="small-button hot" type="button">Randomize all</button>
           </div>
           </div>
@@ -701,8 +754,8 @@ light</textarea>
           <span><kbd>1-8</kbd> scenes</span>
         </div>
 
-        <button id="start" class="start-button" type="button">Go</button>
       </section>
+      </div>
     </main>
 
     <section id="stage" class="stage" aria-label="Visualizer playback" tabindex="-1" hidden>
@@ -712,6 +765,15 @@ light</textarea>
         <button id="stageMenu" class="small-button" type="button">Menu</button>
         <button id="stagePause" class="small-button" type="button" aria-pressed="false">Pause</button>
       </nav>
+      <section id="renderRecovery" class="render-recovery" aria-label="Playback recovery" role="alert" hidden>
+        <p><strong>Playback needs attention</strong></p>
+        <p id="renderErrorMessage"></p>
+        <div class="recovery-actions">
+          <button id="retryPlayback" class="small-button" type="button">Retry look</button>
+          <button id="safePlayback" class="small-button" type="button">Safe look</button>
+          <button id="recoveryMenu" class="small-button secondary-button" type="button">Menu</button>
+        </div>
+      </section>
       <div id="stageHud" class="stage-hud" hidden>
         <span id="beatDot" class="beat-dot"></span>
         <span id="stageInfo">128 BPM</span>
@@ -730,10 +792,14 @@ light</textarea>
     <script src="js/app-text.js"></script>
     <script src="js/app-render.js"></script>
     <script src="js/app-scenes.js"></script>
+    <script src="js/app-history.js"></script>
     <script src="js/app-transport.js"></script>
     <script src="js/app-export.js"></script>
     <script src="js/app-audio.js"></script>
     <script src="js/app-ui.js"></script>
+    <script src="js/app-gallery.js"></script>
+    <script src="js/app-workspace.js"></script>
+    <script src="js/app-live.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -232,14 +232,28 @@ const NetHackVisualizer = (() => {
   }
   function nextToward(world, start, target, turn) {
     if (start === target) return start;
-    const visited = new Set([start]), queue = [{ index: start, first: start }];
-    for (let head = 0; head < queue.length; head++) {
-      const current = queue[head];
-      for (const next of neighbors(world, current.index, turn)) {
-        if (visited.has(next)) continue;
-        const first = head === 0 ? next : current.first;
+    const data = simulation(world);
+    // The map has a fixed cell budget. Reuse its BFS storage instead of making
+    // a Set, queue objects and neighbor arrays on every companion action.
+    const search = data.search || (data.search = {
+      queue: new Int32Array(WIDTH * HEIGHT), first: new Int32Array(WIDTH * HEIGHT),
+      visited: new Uint32Array(WIDTH * HEIGHT), generation: 0
+    });
+    search.generation = (search.generation + 1) >>> 0;
+    if (!search.generation) { search.visited.fill(0); search.generation = 1; }
+    const generation = search.generation;
+    search.queue[0] = start; search.first[0] = start; search.visited[start] = generation;
+    let tail = 1;
+    for (let head = 0; head < tail; head++) {
+      const current = search.queue[head], currentX = current % WIDTH;
+      // Keep the original direction order and first-step tie breaking.
+      for (const [dx, dy] of DIRECTIONS) {
+        const next = current + dy * WIDTH + dx;
+        if (next < 0 || next >= WIDTH * HEIGHT || Math.abs(next % WIDTH - currentX) > 1 || search.visited[next] === generation || !passable(world, next, turn)) continue;
+        const first = head === 0 ? next : search.first[head];
         if (next === target) return first;
-        visited.add(next); queue.push({ index: next, first });
+        search.visited[next] = generation;
+        search.queue[tail] = next; search.first[tail++] = first;
       }
     }
     return start;

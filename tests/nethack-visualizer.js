@@ -142,6 +142,45 @@
       oldDogFrame = current;
     }
     assert(dogLoitered && dogFollowed, "the companion can loiter nearby and follow instead of marching in a fixed trailing slot");
+    // Independently resolve distances outward from the hero, then choose the
+    // first shortest neighbor. This verifies BFS tie ordering and closed doors
+    // without repeating the engine's first-step queue implementation.
+    const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    for (const layout of ["rooms", "maze", "cavern"]) {
+      const options = { bpm: 120, nhSpeed: 1, nhLayout: layout, nhPopulation: 0 };
+      const seed = `shortest-companion-${layout}`;
+      const initial = NetHackVisualizer.buildFrame(options, 0, seed);
+      const world = initial.world, passages = new Set(world.passages), doors = new Map(world.doors.map(door => [door.index, door.openTurn]));
+      let expectedPet = initial.pet.y * 80 + initial.pet.x;
+      const adjacent = (index, turn) => directions.map(([dx, dy]) => index + dy * 80 + dx).filter(next =>
+        next >= 0 && next < 1680 && Math.abs(next % 80 - index % 80) <= 1 && passages.has(next) && turn >= (doors.get(next) ?? 0));
+      const shortestStep = (start, target, turn) => {
+        const distance = new Int32Array(1680).fill(-1), queue = [target];
+        distance[target] = 0;
+        for (let head = 0; head < queue.length; head++) {
+          for (const next of adjacent(queue[head], turn)) if (distance[next] < 0) {
+            distance[next] = distance[queue[head]] + 1; queue.push(next);
+          }
+        }
+        let best = start, bestDistance = Infinity;
+        for (const next of adjacent(start, turn)) if (distance[next] >= 0 && distance[next] < bestDistance) {
+          best = next; bestDistance = distance[next];
+        }
+        return best;
+      };
+      for (let turn = 1; turn <= 180; turn++) {
+        const frame = NetHackVisualizer.buildFrame(options, turn * 500, seed);
+        const hero = frame.hero.y * 80 + frame.hero.x;
+        const actions = Math.floor(turn * 1.5) - Math.floor((turn - 1) * 1.5);
+        for (let action = 0; action < actions; action++) {
+          const distance = (expectedPet % 80 - frame.hero.x) ** 2 + (Math.floor(expectedPet / 80) - frame.hero.y) ** 2;
+          const terrain = world.tiles[frame.hero.y][frame.hero.x];
+          if (distance < 9 && !(distance > 1 && "#<>+".includes(terrain))) break;
+          expectedPet = shortestStep(expectedPet, hero, turn);
+        }
+        assert(frame.pet.y * 80 + frame.pet.x === expectedPet, `${layout} companion preserves shortest-path direction ties and door timing`);
+      }
+    }
     for (const layout of ["rooms", "maze", "cavern"]) {
       const early = build({ nhLayout: layout, nhFog: true }, 1500);
       const late = build({ nhLayout: layout, nhFog: true }, 1e12);

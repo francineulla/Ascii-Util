@@ -3,6 +3,12 @@
 // Renderer dispatch, canvas presentation, effects, and preview lifecycle.
 // Classic scripts share app-state.js bindings so index.html also works over file://.
 
+const renderLimits = Object.freeze({ maxCells: 60000, maxCanvasPixels: 8294400, maxPreviewPixels: 2073600, maxCanvasSide: 8192 });
+
+function renderExtent(value) {
+  return clamp(Number.isFinite(Number(value)) ? Number(value) : 1, 1, 16384);
+}
+
 function getScanlineSettings(options) {
   const numeric = (id, min, max) => {
     const value = Number(options[id] ?? displayDefaults[id]);
@@ -35,13 +41,27 @@ function drawScanlines(ctx, width, height, options) {
 }
 
 function getEffectiveGlyphSize(width = window.innerWidth, height = window.innerHeight) {
-  return Math.max(6, state.options.glyphSize * getQualityProfile().glyphScale);
+  width = renderExtent(width);
+  height = renderExtent(height);
+  const requested = Number(state.options.glyphSize);
+  const base = (Number.isFinite(requested) ? clamp(requested, 8, 24) : 13) * getQualityProfile().glyphScale;
+  // Bound per-frame ASCII allocations independently of viewport resolution.
+  const budgetSize = Math.sqrt(width * height / (renderLimits.maxCells * 0.62));
+  return Math.max(6, base, budgetSize, height * 24 / renderLimits.maxCells, width * 12 / (0.62 * renderLimits.maxCells));
+}
+
+function getMonitorHeight(width, height) {
+  return clamp(Math.round(480 * renderExtent(height) / renderExtent(width)), 120, 1080);
 }
 
 function setupCanvas(canvas = controls.canvas, width = window.innerWidth, height = window.innerHeight) {
-  const dpr = window.devicePixelRatio || 1;
-  const targetWidth = Math.floor(width * dpr);
-  const targetHeight = Math.floor(height * dpr);
+  width = renderExtent(width);
+  height = renderExtent(height);
+  const dpr = Math.max(1, Math.min(2, Number(window.devicePixelRatio) || 1));
+  const budget = canvas === controls.previewCanvas ? renderLimits.maxPreviewPixels : renderLimits.maxCanvasPixels;
+  const scale = Math.min(dpr, Math.sqrt(budget / (width * height)), renderLimits.maxCanvasSide / width, renderLimits.maxCanvasSide / height);
+  const targetWidth = Math.max(1, Math.floor(width * scale));
+  const targetHeight = Math.max(1, Math.floor(height * scale));
 
   if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
     canvas.width = targetWidth;
@@ -50,7 +70,8 @@ function setupCanvas(canvas = controls.canvas, width = window.innerWidth, height
 
   const contextKey = canvas === controls.previewCanvas ? "previewContext" : "canvasContext";
   if (!state[contextKey]) state[contextKey] = canvas.getContext("2d");
-  state[contextKey].setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!state[contextKey] || state[contextKey].isContextLost?.()) throw new Error("Display context unavailable. Retry the look or choose Safe look.");
+  state[contextKey].setTransform(targetWidth / width, 0, 0, targetHeight / height, 0, 0);
   if (canvas === controls.canvas) {
     state.canvasWidth = width;
     state.canvasHeight = height;
@@ -120,6 +141,8 @@ function triggerBeatFlash(beatIndex, options) {
 }
 
 function buildFrame(now, viewportWidth = window.innerWidth, viewportHeight = window.innerHeight, suppressEffects = false) {
+  viewportWidth = renderExtent(viewportWidth);
+  viewportHeight = renderExtent(viewportHeight);
   const options = state.options;
   const effectiveGlyphSize = getEffectiveGlyphSize(viewportWidth, viewportHeight);
   const lineHeight = effectiveGlyphSize;
@@ -235,21 +258,29 @@ function buildFrame(now, viewportWidth = window.innerWidth, viewportHeight = win
 }
 
 function renderFrame(frame) {
-  state.currentFrame = frame;
   if (!frame.atari && !frame.vm2 && !frame.nethack && !frame.pixelmusic && state.options.colorMode === "classic" && !state.options.recordingMode) {
+    const fontSize = `${getEffectiveGlyphSize()}px`;
+    if (controls.ascii.style.fontSize !== fontSize) {
+      controls.ascii.style.fontSize = fontSize;
+      controls.ascii.style.lineHeight = fontSize;
+    }
     controls.ascii.classList.remove("colorized");
     controls.ascii.hidden = false;
     controls.canvas.hidden = true;
     controls.ascii.textContent = frameToText(frame.grid);
+    state.currentFrame = frame;
+    state.lastGoodOutput = { canvas: false, options: { ...state.options } };
     return;
   }
 
-  controls.ascii.classList.add("colorized");
-  controls.ascii.hidden = true;
-  controls.canvas.hidden = false;
   // Size the on-screen CRT to the viewport; fixed capture formats are applied on export.
   const capture = frame.atari || frame.vm2 || frame.nethack || frame.pixelmusic ? { width: window.innerWidth, height: window.innerHeight } : getCaptureSize();
   renderFrameToCanvas(frame, controls.canvas, capture.width, capture.height);
+  controls.ascii.classList.add("colorized");
+  controls.ascii.hidden = true;
+  controls.canvas.hidden = false;
+  state.currentFrame = frame;
+  state.lastGoodOutput = { canvas: true, options: { ...state.options } };
 }
 
 function prepareStateFromControls(preserveStart = false) {
@@ -268,7 +299,7 @@ function prepareStateFromControls(preserveStart = false) {
 }
 
 function renderPreview(now = performance.now()) {
-  if (!controls.previewCanvas || state.running) return;
+  if (!controls.previewCanvas || state.running || controls.menu.hidden || document.hidden) return;
   syncPixelmusicPreviewSession();
   const previous = {
     options: state.options,
@@ -312,7 +343,7 @@ function renderPreview(now = performance.now()) {
     renderFrameToCanvas(frame, controls.previewCanvas, width, height);
     if (frame.pixelmusic) {
       const monitor = document.getElementById("pixelmusicMonitor");
-      const monitorHeight = state.options.pmStretch ? Math.max(120, Math.round(480 * height / width)) : 360;
+      const monitorHeight = state.options.pmStretch ? getMonitorHeight(width, height) : 360;
       if (monitor.height !== monitorHeight) monitor.height = monitorHeight;
       monitor.style.filter = state.options.invert ? "invert(1) contrast(1.35)" : "none";
       Pixelmusic3000.draw(monitor.getContext("2d"), frame.pixelmusic, monitor.width, monitor.height);
@@ -323,14 +354,14 @@ function renderPreview(now = performance.now()) {
       const monitor = document.getElementById("nethackMonitor");
       const ctx = monitor.getContext("2d");
       monitor.style.filter = state.options.invert ? "invert(1) contrast(1.35)" : "none";
-      const monitorHeight = Math.max(120, Math.round(480 * height / width));
+      const monitorHeight = getMonitorHeight(width, height);
       if (monitor.height !== monitorHeight) monitor.height = monitorHeight;
       NetHackVisualizer.draw(ctx, frame.nethack, monitor.width, monitor.height);
       drawScanlines(ctx, monitor.width, monitor.height, state.options);
     }
     if (frame.atari) {
       const monitor = document.getElementById("atariMonitor");
-      const monitorHeight = frame.atari.stretch ? Math.max(120, Math.round(480 * height / width)) : 360;
+      const monitorHeight = frame.atari.stretch ? getMonitorHeight(width, height) : 360;
       if (monitor.height !== monitorHeight) monitor.height = monitorHeight;
       monitor.style.aspectRatio = `${monitor.width} / ${monitor.height}`;
       monitor.style.filter = state.options.invert ? "invert(1) contrast(1.35)" : "none";
@@ -339,7 +370,7 @@ function renderPreview(now = performance.now()) {
     }
     if (frame.vm2) {
       const monitor = document.getElementById("vm2Monitor");
-      const monitorHeight = Math.max(120, Math.round(480 * height / width));
+      const monitorHeight = getMonitorHeight(width, height);
       if (monitor.height !== monitorHeight) monitor.height = monitorHeight;
       monitor.style.filter = state.options.invert ? "invert(1) contrast(1.35)" : "none";
       VideoMusic2.draw(monitor.getContext("2d"), frame.vm2, monitor.width, monitor.height);
@@ -399,7 +430,7 @@ function schedulePreview() {
 }
 
 function startPreviewLoop() {
-  if (state.running || !controls.livePreview.checked || state.previewRaf) return;
+  if (state.running || controls.menu.hidden || document.hidden || !controls.livePreview.checked || state.previewRaf) return;
   if (!state.previewStartedAt) state.previewStartedAt = performance.now();
   state.previewRaf = requestAnimationFrame(previewLoop);
 }
@@ -412,7 +443,7 @@ function stopPreviewLoop() {
 
 function previewLoop(now) {
   state.previewRaf = 0;
-  if (state.running || !controls.livePreview.checked) return;
+  if (state.running || controls.menu.hidden || document.hidden || !controls.livePreview.checked) return;
   if (!state.lastPreviewAt || now - state.lastPreviewAt >= 1000 / 18) {
     state.lastPreviewAt = now;
     renderPreview(now);

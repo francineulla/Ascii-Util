@@ -147,12 +147,16 @@
     storeScene();
     el("lockTempo").checked = true;
     el("lockPalette").checked = true;
+    const setupBeforeLiveShortcuts = localStorage.getItem("asciiBpmSetup");
     key("ArrowUp", "ArrowUp");
     key("i", "KeyI");
     const lockedBpm = controls.bpm.value;
-    const savedSetup = JSON.parse(localStorage.getItem("asciiBpmSetup"));
-    assert(savedSetup.lockedValues.bpm === lockedBpm && savedSetup.lockedValues.invert === true, "tempo and inversion keyboard shortcuts persist their locked values");
+    assert(localStorage.getItem("asciiBpmSetup") === setupBeforeLiveShortcuts, "locked shortcuts defer browser storage while the stage is running");
     assert(el("sceneDirty").textContent.includes("no changes"), "locked shortcut changes stay excluded from scene dirty feedback");
+    stop();
+    stopBackgroundWork();
+    const savedSetup = JSON.parse(localStorage.getItem("asciiBpmSetup"));
+    assert(savedSetup.lockedValues.bpm === lockedBpm && savedSetup.lockedValues.invert === true, "leaving playback persists the final locked shortcut values");
     controls.bpm.value = "20";
     controls.invert.checked = false;
     loadSetup();
@@ -169,6 +173,60 @@
     HTMLAnchorElement.prototype.click = function () { download = { href: this.href, name: this.download }; };
     try {
       Object.defineProperty(window, "devicePixelRatio", { configurable: true, value: 2 });
+      applyPreset({ ...getPreset(), visualizerMode: "ascii", lyrics: "ALPHA BETA GAMMA DELTA EPSILON ZETA ETA THETA",
+        bpm: "120", beatRate: "1", quality: "low", glyphSize: "24", autoSections: false, backgroundOnly: false,
+        livePreview: true, recordingMode: false, captureSize: "window", colorMode: "spotlight", invert: false, scanlines: false });
+      stopBackgroundWork();
+      const previewNow = performance.now();
+      state.previewPrepared = null;
+      state.previewStartedAt = previewNow - 2500;
+      renderPreview(previewNow);
+      const shownText = state.previewFrame, previewStartedAt = state.previewStartedAt;
+      assert(shownText.wordStepIndex === 5 && shownText.beatIndex === 5, "live text preview reaches a later word before PNG capture");
+      saveFrame();
+      const liveText = await decodePng(download.href);
+      assert(state.currentFrame === shownText && state.currentFrame.elapsed === 2500,
+        "window PNG captures the exact displayed live text frame instead of restarting at the first word");
+      assert(liveText.width === window.innerWidth && liveText.height === window.innerHeight && litPixels(liveText) > 0,
+        "live text PNG has visible content at exact window pixels even at DPR 2");
+      controls.recordingMode.checked = true;
+      for (const size of ["720x720", "1080x1920"]) {
+        controls.captureSize.value = size;
+        // PNG decoding yields to browser timers. Capture the displayed moment
+        // for each click, since a live preview or deferred MIDI refresh may
+        // legitimately advance it between the square and portrait exports.
+        const shownForSize = state.previewFrame;
+        saveFrame();
+        const exportedForSize = state.currentFrame;
+        const [width, height] = size.split("x").map(Number);
+        const glyphSize = getEffectiveGlyphSize(width, height);
+        const fixedText = await decodePng(download.href);
+        assert(fixedText.width === width && fixedText.height === height,
+          `${size} live text PNG respects the fixed export dimensions`);
+        assert(exportedForSize.elapsed === shownForSize.elapsed && exportedForSize.wordStepIndex === shownForSize.wordStepIndex
+          && exportedForSize.beatIndex === shownForSize.beatIndex && exportedForSize.grid.length === Math.max(12, Math.floor(height / glyphSize))
+          && exportedForSize.grid[0].length === Math.max(24, Math.floor(width / (glyphSize * 0.62))),
+          `${size} reflows the text grid for output while preserving the displayed word and beat`);
+        if (size === "720x720") {
+          await wait(120);
+          renderPreview();
+          stopBackgroundWork();
+          assert(state.previewFrame !== shownForSize && state.previewFrame.elapsed > shownForSize.elapsed,
+            "the live preview advances before the second fixed-format capture");
+        }
+      }
+      controls.recordingMode.checked = false;
+      controls.captureSize.value = "window";
+      controls.lyrics.value = "UPDATED WORDS CAPTURE THE CURRENT MOMENT";
+      controls.lyrics.dispatchEvent(new Event("input", { bubbles: true }));
+      stopBackgroundWork();
+      assert(!state.previewFrame, "a pending text edit invalidates the previous capture frame");
+      saveFrame();
+      assert(state.currentFrame === state.previewFrame && state.currentFrame !== shownText
+        && state.previewPrepared.words[0].text === "UPDATED" && state.currentFrame.wordStepIndex >= 5
+        && state.previewStartedAt === previewStartedAt, "PNG refreshes pending text edits without rewinding the live preview session");
+      controls.livePreview.checked = false;
+      stopBackgroundWork();
       controls.visualizerMode.value = "ascii";
       controls.recordingMode.checked = true;
       controls.captureSize.value = "1280x720";

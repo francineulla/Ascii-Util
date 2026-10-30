@@ -22,10 +22,12 @@ function mulberry32(seed) {
 }
 
 function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
+  const bounded = Math.min(max, Math.max(min, value));
+  return Number.isNaN(bounded) ? min : bounded;
 }
 
 function parseTokensFromText(text) {
+  text = typeof text === "string" ? text.slice(0, maxTextareaChars) : "";
   if (!text) return [{ text: "VOID", emphasis: "normal" }];
   const mode = controls.lyricMode.value;
   const cleanLines = text
@@ -40,21 +42,21 @@ function parseTokensFromText(text) {
       : controls.splitWords.checked
         ? source.match(/[\p{L}\p{N}']+/gu) || []
       : cleanLines;
-  const tokens = pieces
+  const tokens = pieces.slice(0, 800)
     .map((piece) => parseToken(piece, mode === "markup"))
-    .filter((token) => token.text)
-    .slice(0, 800);
+    .filter((token) => token.text);
   return tokens.length ? tokens : [{ text: "VOID", emphasis: "normal" }];
 }
 
 function parseWords() {
-  return parseTokensFromText(controls.lyrics.value.trim());
+  return parseTokensFromText(controls.lyrics.value.slice(0, maxTextareaChars).trim());
 }
 
 function parseSections() {
-  const sections = controls.lyrics.value
+  const sections = controls.lyrics.value.slice(0, maxTextareaChars)
     .replace(/\r/g, "")
     .split(/\n\s*\n+/)
+    .slice(0, 128)
     .map((section) => parseTokensFromText(section.trim()))
     .filter((section) => section.length);
   return sections.length ? sections : [parseWords()];
@@ -73,7 +75,9 @@ function parseToken(piece, allowMarkup = false) {
   }
 
   return {
-    text: text.trim().toUpperCase(),
+    // Longer source phrases remain editable; one frame never walks an entire
+    // pasted document to stamp a word that cannot fit on the screen.
+    text: text.trim().slice(0, 256).toUpperCase().slice(0, 256),
     emphasis
   };
 }
@@ -83,26 +87,29 @@ function tokenText(token) {
 }
 
 function parseMask() {
-  const rawLines = controls.maskArt.value.replace(/\r/g, "").split("\n");
+  if (controls.maskMode.value === "off") return null;
+  const rawLines = controls.maskArt.value.slice(0, maxTextareaChars).replace(/\r/g, "").split("\n");
   let start = 0;
   let end = rawLines.length;
   while (start < end && rawLines[start].length === 0) start += 1;
   while (end > start && rawLines[end - 1].length === 0) end -= 1;
   const lines = rawLines.slice(start, end);
-  if (!lines.some((line) => /[^\t ]/.test(line)) || controls.maskMode.value === "off") return null;
+  if (!lines.some((line) => /[^\t ]/.test(line))) return null;
 
-  const width = Math.max(...lines.map((line) => line.length));
-  const rows = lines.map((line) => line.padEnd(width, " ").split(""));
+  let width = 0;
+  for (const line of lines) width = Math.max(width, line.length);
+  // Sparse rows avoid width * height padding: a short sparse paste could
+  // otherwise allocate hundreds of millions of blank character cells.
   return {
     width,
-    height: rows.length,
-    rows
+    height: lines.length,
+    rows: lines
   };
 }
 
 function sampleMask(mask, x, y, gridWidth, gridHeight) {
   if (!mask) return null;
-  const scale = Math.max(1, Number(state.options.maskScale) || 1);
+  const scale = clamp(Number(state.options.maskScale) || 1, 1, 8);
   const targetWidth = mask.width * scale;
   const targetHeight = mask.height * scale;
   const startX = Math.floor((gridWidth - targetWidth) / 2);
@@ -111,7 +118,7 @@ function sampleMask(mask, x, y, gridWidth, gridHeight) {
   const my = Math.floor((y - startY) / scale);
 
   if (mx < 0 || my < 0 || mx >= mask.width || my >= mask.height) return null;
-  const char = mask.rows[my][mx];
+  const char = mask.rows[my]?.[mx] ?? " ";
   if (char === " " || char === "\t") return null;
   return char;
 }
@@ -199,7 +206,7 @@ function pick(list, random) {
 function getCharset() {
   if (state.options.charsetPreset === "custom") {
     const custom = controls.customCharset.value || state.options.customCharset || "";
-    return custom.length ? custom : charsets.full;
+    return custom.length ? custom.slice(0, maxCustomCharsetChars) : charsets.full;
   }
   return charsets[state.options.charsetPreset] || charsets.full;
 }

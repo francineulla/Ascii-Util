@@ -131,7 +131,7 @@ const lockGroups = {
   lockPalette: ["palette", "colorMode", "invert", "atariColor", "vm2Palette", "vm2Color", "vm2Hue", "vm2Saturation", "nhPalette", "pmPalette"],
   lockPerformance: ["quality", "fpsCap", "glyphSize", "captureSize", "recordingMode"]
 };
-const setupControls = [...Object.keys(lockGroups), "sceneEffect", "sceneDuration", "audioSensitivity", "audioSource", "audioAttack", "audioRelease", "audioGate"];
+const setupControls = [...Object.keys(lockGroups), "sceneEffect", "sceneDuration", "audioSensitivity", "audioSource", "audioAttack", "audioRelease", "audioGate", "keepAwake"];
 let sceneStorageFailed = false;
 
 let state = {

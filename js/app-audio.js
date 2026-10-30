@@ -12,6 +12,168 @@ const audioState = {
   frequencies: null, frequencyBuffers: [], features: emptyAudioFeatures(), previousTarget: 0, lastSampleAt: null,
   left: emptyAudioChannel(), right: emptyAudioChannel()
 };
+const audioSetupState = {
+  initialized: false, media: null, devices: [], deviceId: "", enumeration: 0, enumerating: false,
+  enumerationError: "", connecting: false, connectedSource: "", requestedDeviceId: "", connectedDeviceId: "",
+  calibration: null, calibrationMessage: ""
+};
+
+function audioDecibels(level) {
+  return Math.max(-70, Math.min(0, 20 * Math.log10(Math.max(0.0000001, level))));
+}
+
+function updateAudioDeviceControls() {
+  const picker = document.getElementById("audioDevice"), refresh = document.getElementById("refreshAudioDevices");
+  const screen = document.getElementById("audioSource")?.value === "screen";
+  if (picker) picker.disabled = screen || audioSetupState.connecting;
+  if (refresh) refresh.disabled = screen || audioSetupState.connecting || audioSetupState.enumerating;
+  const source = document.getElementById("audioSource");
+  if (source) source.disabled = audioSetupState.connecting;
+  const connect = document.getElementById("connectAudio");
+  if (connect) {
+    connect.disabled = audioSetupState.connecting;
+    connect.textContent = audioSetupState.connecting ? "Connecting…" : audioState.stream ? "Reconnect audio" : "Connect audio";
+  }
+  const help = document.getElementById("audioDeviceHelp");
+  if (!help) return;
+  const changed = audioState.stream && (audioSetupState.connectedSource !== (screen ? "screen" : "microphone")
+    || (!screen && audioSetupState.requestedDeviceId !== audioSetupState.deviceId));
+  const unavailable = audioSetupState.deviceId && !audioSetupState.devices.some(device => device.deviceId === audioSetupState.deviceId);
+  help.textContent = audioSetupState.connecting ? "Waiting for the selected source. Disconnect cancels the request."
+    : changed ? "Selection changed. The current input stays connected until you click Reconnect audio."
+      : screen ? "Choose shared tab or system audio in the browser picker when you connect."
+        : audioSetupState.enumerationError || (audioSetupState.enumerating ? "Refreshing inputs…"
+          : unavailable ? "The saved input is not listed. Refresh inputs or choose another input before connecting."
+            : audioSetupState.devices.some(device => !device.label) ? "Connect audio once to reveal input names, then refresh. Refresh inputs never requests access."
+              : "Choose an input, then Connect audio. Device changes are applied only when you reconnect.");
+}
+
+async function refreshAudioDevices() {
+  const picker = document.getElementById("audioDevice");
+  if (!picker) return;
+  const request = ++audioSetupState.enumeration, media = navigator.mediaDevices;
+  audioSetupState.enumerating = true;
+  audioSetupState.enumerationError = "";
+  updateAudioDeviceControls();
+  try {
+    if (!media?.enumerateDevices) throw new Error("Input names are unavailable in this browser. System default still works.");
+    const devices = await media.enumerateDevices();
+    if (request !== audioSetupState.enumeration || media !== navigator.mediaDevices) return;
+    audioSetupState.devices = devices.filter(device => device.kind === "audioinput" && device.deviceId && device.deviceId !== "default");
+    const options = [new Option("System default", "")];
+    for (const [index, device] of audioSetupState.devices.entries()) options.push(new Option(device.label || `Audio input ${index + 1} · connect to reveal name`, device.deviceId));
+    if (audioSetupState.deviceId && !audioSetupState.devices.some(device => device.deviceId === audioSetupState.deviceId)) {
+      options.push(new Option("Saved input · unavailable", audioSetupState.deviceId));
+    }
+    picker.replaceChildren(...options);
+    picker.value = audioSetupState.deviceId;
+    if (audioState.stream && audioSetupState.connectedSource === "microphone" && audioSetupState.requestedDeviceId
+      && !audioSetupState.devices.some(device => device.deviceId === audioSetupState.connectedDeviceId)) {
+      disconnectAudio("Audio input disconnected. Choose an available input and reconnect.");
+    }
+  } catch (error) {
+    if (request !== audioSetupState.enumeration) return;
+    audioSetupState.enumerationError = error.message || "Could not list inputs. Refresh and try again.";
+    if (audioSetupState.deviceId && !Array.from(picker.options).some(option => option.value === audioSetupState.deviceId)) {
+      picker.add(new Option("Saved input · connect to check availability", audioSetupState.deviceId));
+      picker.value = audioSetupState.deviceId;
+    }
+  } finally {
+    if (request === audioSetupState.enumeration) {
+      audioSetupState.enumerating = false;
+      updateAudioDeviceControls();
+    }
+  }
+}
+
+function initAudioSetup() {
+  if (!audioSetupState.initialized) {
+    audioSetupState.initialized = true;
+    try { audioSetupState.deviceId = localStorage.getItem("asciiBpmAudioDevice") || ""; } catch (error) { /* Capture works without browser storage. */ }
+    document.getElementById("audioDevice")?.addEventListener("change", event => {
+      audioSetupState.deviceId = event.target.value;
+      try { localStorage.setItem("asciiBpmAudioDevice", audioSetupState.deviceId); } catch (error) { /* Keep the session selection. */ }
+      updateAudioDeviceControls();
+    });
+    document.getElementById("refreshAudioDevices")?.addEventListener("click", refreshAudioDevices);
+    document.getElementById("audioSource")?.addEventListener("change", updateAudioDeviceControls);
+    document.getElementById("calibrateAudio")?.addEventListener("click", calibrateAudioNoiseGate);
+    document.getElementById("resumeAudio")?.addEventListener("click", resumeConnectedAudio);
+    for (const id of ["audioGate", "audioSensitivity"]) document.getElementById(id)?.addEventListener("input", () => {
+      audioSetupState.calibrationMessage = "";
+      updateAudioCalibration();
+    });
+  }
+  const media = navigator.mediaDevices;
+  if (media !== audioSetupState.media) {
+    audioSetupState.media?.removeEventListener?.("devicechange", refreshAudioDevices);
+    audioSetupState.media = media;
+    media?.addEventListener?.("devicechange", refreshAudioDevices);
+  }
+  updateAudioCalibration();
+  return refreshAudioDevices();
+}
+
+function updateAudioCalibration() {
+  for (const [name, channel] of [["Left", audioState.left], ["Right", audioState.right]]) {
+    const decibels = audioDecibels(channel.rawRms), meter = document.getElementById(`audioRaw${name}`);
+    if (meter) meter.value = decibels;
+    const output = document.getElementById(`audioRaw${name}Value`);
+    if (output) output.textContent = channel.rawRms > 0 ? `${decibels.toFixed(1)} dBFS` : "−∞ dBFS";
+  }
+  const button = document.getElementById("calibrateAudio");
+  if (button) {
+    button.disabled = !audioState.analyser || Boolean(audioSetupState.calibration);
+    button.textContent = audioSetupState.calibration ? "Measuring noise…" : "Measure noise floor";
+  }
+  const readout = document.getElementById("audioCalibrationReadout");
+  if (!readout) return;
+  const gateDb = Number(document.getElementById("audioGate")?.value || -42), gate = Math.pow(10, gateDb / 20);
+  const gateState = `Left gate ${audioState.left.rawRms >= gate ? "open" : "closed"} · Right gate ${audioState.right.rawRms >= gate ? "open" : "closed"}.`;
+  let guidance = "Aim for a strong response without keeping the response meters pinned at full.";
+  if (audioState.left.clipped || audioState.right.clipped) guidance = "Input is clipping. Lower the source or interface gain; sensitivity cannot repair input clipping.";
+  else if (Math.max(audioState.left.level, audioState.right.level) > 0.98) guidance = "Response is at its limit. Lower sensitivity to retain changes in loudness.";
+  else if (Math.max(audioState.left.rawRms, audioState.right.rawRms) < gate) guidance = "The gate is blocking this signal. Lower the gate for quiet music, or stop the source and Measure noise floor.";
+  else if (Math.max(audioState.left.level, audioState.right.level) < 0.1) guidance = "Raise sensitivity if the picture barely responds while music is playing.";
+  const message = audioSetupState.calibration ? "Measuring input noise for 2 seconds. Keep the music or source silent."
+    : !audioState.analyser ? "Connect audio to see raw input levels before the gate and sensitivity. Stop the source before using Measure noise floor."
+      : `${audioSetupState.calibrationMessage ? `${audioSetupState.calibrationMessage} ` : ""}${gateState} ${guidance}`;
+  if (readout.textContent !== message) readout.textContent = message;
+}
+
+function calibrateAudioNoiseGate() {
+  if (!audioState.analyser || audioSetupState.calibration) return;
+  const calibration = { generation: audioState.generation, startedAt: performance.now(), samples: [], firstAt: null, lastAt: null, timer: 0 };
+  audioSetupState.calibration = calibration;
+  audioSetupState.calibrationMessage = "";
+  calibration.timer = setTimeout(finishAudioNoiseCalibration, 2300);
+  updateAudioCalibration();
+}
+
+function finishAudioNoiseCalibration() {
+  const calibration = audioSetupState.calibration;
+  if (!calibration) return;
+  clearTimeout(calibration.timer);
+  audioSetupState.calibration = null;
+  if (calibration.generation !== audioState.generation || !audioState.analyser) return;
+  const samples = calibration.samples.sort((first, second) => first - second);
+  if (samples.length < 20 || calibration.lastAt - calibration.firstAt < 1500) {
+    audioSetupState.calibrationMessage = "Not enough audio samples. Keep this tab visible and try again; the gate is unchanged.";
+  } else {
+    const floor = samples[Math.min(samples.length - 1, Math.floor(samples.length * 0.9))];
+    if (floor > -24) audioSetupState.calibrationMessage = "Input is too loud to measure its noise floor. Stop the source or lower input gain and try again; the gate is unchanged.";
+    else {
+      const value = Math.round(clamp(floor + 6, -70, -10)), control = document.getElementById("audioGate");
+      if (control) {
+        control.value = String(value);
+        control.dispatchEvent(new Event("input", { bubbles: true }));
+        control.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      audioSetupState.calibrationMessage = `Gate set to ${value} dBFS, 6 dB above measured noise (${floor.toFixed(1)} dBFS).`;
+    }
+  }
+  updateAudioCalibration();
+}
 
 function updateAudioMeters() {
   document.getElementById("audioMeter").value = audioState.level;
@@ -24,17 +186,71 @@ function updateAudioMeters() {
       indicator.classList.toggle("clipping", channel.clipped);
     }
   }
+  updateAudioCalibration();
+}
+
+function clearAudioSignal() {
+  Object.assign(audioState, { level: 0, features: emptyAudioFeatures(), previousTarget: 0, lastSampleAt: null,
+    left: emptyAudioChannel(), right: emptyAudioChannel() });
+}
+
+function stopAudioStream(stream) {
+  if (!stream) return;
+  for (const track of stream.getTracks()) {
+    try { track.stop(); } catch (error) { /* Release other tracks even if this device is already gone. */ }
+  }
+}
+
+function updateAudioContextState(context, generation) {
+  if (audioState.context !== context || generation !== audioState.generation) return;
+  const button = document.getElementById("resumeAudio");
+  const suspended = context.state === "suspended" || context.state === "interrupted";
+  if (button) { button.hidden = !suspended; button.disabled = false; }
+  if (context.state === "closed") {
+    disconnectAudio("Audio context closed. Reconnect your input.");
+  } else if (suspended) {
+    clearAudioSignal();
+    updateAudioMeters();
+    document.getElementById("audioReadout").textContent = "Audio suspended. Use Resume audio to continue with this input.";
+    schedulePreview();
+  } else if (context.state === "running") {
+    document.getElementById("audioReadout").textContent = audioSetupState.connectedSource === "screen" ? "Shared audio connected" : "Audio input connected";
+  }
+}
+
+async function resumeConnectedAudio() {
+  const context = audioState.context, generation = audioState.generation;
+  if (!context) return;
+  const button = document.getElementById("resumeAudio");
+  if (button) button.disabled = true;
+  try {
+    await context.resume();
+    updateAudioContextState(context, generation);
+  } catch (error) {
+    if (context === audioState.context && generation === audioState.generation) {
+      if (button) button.disabled = false;
+      document.getElementById("audioReadout").textContent = "Audio could not resume. Retry Resume audio or reconnect the input.";
+    }
+  }
+}
+
+function sampleAudioSafely() {
+  try { sampleAudio(); }
+  catch (error) { disconnectAudio("Audio analysis stopped. Reconnect the input to retry; visual playback continues."); }
 }
 
 function disconnectAudio(message = "Audio off") {
   audioState.generation += 1;
+  if (audioSetupState.calibration) clearTimeout(audioSetupState.calibration.timer);
+  Object.assign(audioSetupState, { connecting: false, connectedSource: "", requestedDeviceId: "", connectedDeviceId: "", calibration: null, calibrationMessage: "" });
   clearInterval(audioState.timer);
-  if (audioState.source) audioState.source.disconnect();
-  for (const node of [audioState.analyser, audioState.stereo, audioState.splitter, ...audioState.analysers, audioState.sink]) {
-    if (node) node.disconnect();
+  for (const node of [audioState.source, audioState.analyser, audioState.stereo, audioState.splitter, ...audioState.analysers, audioState.sink]) {
+    try { node?.disconnect(); } catch (error) { /* Complete cleanup even if one node is already invalid. */ }
   }
-  if (audioState.stream) audioState.stream.getTracks().forEach(track => track.stop());
-  if (audioState.context) audioState.context.close().catch(() => {});
+  stopAudioStream(audioState.stream);
+  if (audioState.context) {
+    try { Promise.resolve(audioState.context.close()).catch(() => {}); } catch (error) { /* Already closed. */ }
+  }
   Object.assign(audioState, {
     stream: null, context: null, source: null, analyser: null, samples: null, level: 0, timer: 0,
     stereo: null, splitter: null, analysers: [], sampleBuffers: [], sink: null,
@@ -46,6 +262,9 @@ function disconnectAudio(message = "Audio off") {
   document.getElementById("connectAudio").disabled = false;
   document.getElementById("disconnectAudio").disabled = true;
   document.getElementById("audioSource").disabled = false;
+  const resume = document.getElementById("resumeAudio");
+  if (resume) { resume.hidden = true; resume.disabled = false; }
+  updateAudioDeviceControls();
   updateAtariControls();
   schedulePreview();
 }
@@ -58,6 +277,7 @@ function getSynthAudioSignal(response = "full") {
 
 function sampleAudio(now = performance.now()) {
   if (!audioState.analyser) return;
+  if (["suspended", "interrupted", "closed"].includes(audioState.context?.state)) return;
   const timestamp = Number.isFinite(now) ? now : performance.now();
   // The first sample gets one nominal analysis interval; subsequent envelopes
   // depend on elapsed time, so timer throttling cannot alter their time constants.
@@ -82,7 +302,8 @@ function sampleAudio(now = performance.now()) {
     const samples = audioState.sampleBuffers[index] || audioState.samples;
     if (analyser !== audioState.analyser) analyser.getFloatTimeDomainData(samples);
     let squareSum = 0, crossings = 0, lastSign = 0, peak = 0;
-    for (const sample of samples) {
+    for (const incoming of samples) {
+      const sample = Number.isFinite(incoming) ? clamp(incoming, -1, 1) : 0;
       squareSum += sample * sample;
       peak = Math.max(peak, Math.abs(sample));
       const sign = sample > 0.001 ? 1 : sample < -0.001 ? -1 : 0;
@@ -132,7 +353,16 @@ function sampleAudio(now = performance.now()) {
   audioState.features.transient = Math.max(channels[0].features.transient, channels[1].features.transient);
   const stereoLevel = channels[0].level + channels[1].level;
   audioState.features.pan = stereoLevel > 0.005 ? (channels[1].level - channels[0].level) / stereoLevel : 0;
-  updateAudioMeters();
+  const calibration = audioSetupState.calibration;
+  if (calibration && calibration.generation === audioState.generation) {
+    calibration.firstAt ??= timestamp;
+    if (calibration.lastAt !== timestamp) {
+      calibration.samples.push(audioDecibels(Math.max(channels[0].rawRms, channels[1].rawRms)));
+      calibration.lastAt = timestamp;
+    }
+    if (timestamp - calibration.startedAt >= 2000) finishAudioNoiseCalibration();
+  }
+  if (!state.running && !document.hidden) updateAudioMeters();
 }
 async function connectAudio() {
   disconnectAudio();
@@ -140,25 +370,37 @@ async function connectAudio() {
   const button = document.getElementById("connectAudio");
   const sourceControl = document.getElementById("audioSource");
   const screen = sourceControl.value === "screen";
+  const selectedDevice = document.getElementById("audioDevice")?.value || audioSetupState.deviceId;
+  audioSetupState.connecting = true;
   button.disabled = true;
   sourceControl.disabled = true;
   document.getElementById("disconnectAudio").disabled = false;
   document.getElementById("audioReadout").textContent = "Waiting for audio permission…";
+  updateAudioDeviceControls();
   let stream;
   try {
     const media = navigator.mediaDevices;
     if (!media || !(screen ? media.getDisplayMedia : media.getUserMedia)) throw new Error("Audio capture is unavailable in this browser or page context.");
     stream = screen
       ? await media.getDisplayMedia({ video: true, audio: true })
-      : await media.getUserMedia({ audio: { channelCount: { ideal: 2 }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+      : await media.getUserMedia({ audio: { ...(selectedDevice ? { deviceId: { exact: selectedDevice } } : {}), channelCount: { ideal: 2 }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
     if (generation !== audioState.generation) {
-      stream.getTracks().forEach(track => track.stop());
+      stopAudioStream(stream);
       return;
     }
     if (!stream.getAudioTracks().length) throw new Error("No audio was shared. Choose a source with audio and enable Share audio.");
     audioState.stream = stream;
+    // A source may disappear while AudioContext.resume() is pending. Observe
+    // it before that await so the generation guard can cancel initialization.
+    for (const track of stream.getTracks()) {
+      track.addEventListener("ended", () => {
+        if (audioState.stream === stream) disconnectAudio("Audio source disconnected. Choose an input and reconnect.");
+      });
+    }
+    if (stream.getTracks().some(track => track.readyState === "ended")) throw new Error("Audio source ended before connection completed. Choose an input and reconnect.");
     const context = new AudioContext();
     audioState.context = context;
+    context.addEventListener?.("statechange", () => updateAudioContextState(context, generation));
     await context.resume();
     if (generation !== audioState.generation) return;
     audioState.source = context.createMediaStreamSource(stream);
@@ -187,17 +429,19 @@ async function connectAudio() {
       audioState.splitter.connect(analyser, channel);
       analyser.connect(audioState.sink);
     }
-    for (const track of stream.getTracks()) {
-      track.addEventListener("ended", () => {
-        if (audioState.stream === stream) disconnectAudio("Audio source disconnected");
-      });
-    }
-    audioState.timer = setInterval(sampleAudio, 16);
-    document.getElementById("audioReadout").textContent = screen ? "Shared audio connected" : "Microphone connected";
+    const inputTrack = stream.getAudioTracks()[0];
+    Object.assign(audioSetupState, { connecting: false, connectedSource: screen ? "screen" : "microphone", requestedDeviceId: screen ? "" : selectedDevice,
+      connectedDeviceId: screen ? "" : inputTrack.getSettings?.().deviceId || selectedDevice });
+    audioState.timer = setInterval(sampleAudioSafely, 16);
+    document.getElementById("audioReadout").textContent = screen ? "Shared audio connected" : inputTrack.label ? `Input connected · ${inputTrack.label}` : "Microphone connected";
+    updateAudioDeviceControls();
+    refreshAudioDevices();
     updateAtariControls();
     schedulePreview();
   } catch (error) {
-    if (stream) stream.getTracks().forEach(track => track.stop());
-    if (generation === audioState.generation) disconnectAudio(`Audio unavailable: ${error.message}`);
+    if (generation === audioState.generation) {
+      if (stream !== audioState.stream) stopAudioStream(stream);
+      disconnectAudio(`Audio unavailable: ${error.name === "OverconstrainedError" || error.name === "NotFoundError" ? "The selected input is unavailable. Refresh inputs, choose an available input, and reconnect." : error.message}`);
+    } else stopAudioStream(stream);
   }
 }

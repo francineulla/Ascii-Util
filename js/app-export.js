@@ -83,20 +83,33 @@ function renderTextFrameToImage(frame) {
 
 function saveFrame() {
   if (!state.running) {
-    // A pending look edit must retain Pixelmusic's automatic selection and Next
-    // history instead of exporting a fresh engine at the static default time.
-    if (controls.visualizerMode.value === "pixelmusic" && !state.previewFrame?.pixelmusic) {
+    // Refresh pending text edits at the current preview time. Pixelmusic also
+    // retains its automatic selection and manual Next history through this path.
+    const mode = controls.visualizerMode.value;
+    if (mode === "pixelmusic" && !state.previewFrame?.pixelmusic
+      || mode === "ascii" && !state.previewFrame?.grid?.length) {
       clearTimeout(state.previewTimer);
       renderPreview();
     }
     prepareStateFromControls();
     const capture = getCaptureSize();
-    const matchingPreview = state.options.visualizerMode === "atari" ? state.previewFrame?.atari
+    const preview = state.previewFrame;
+    const textPreview = state.options.visualizerMode === "ascii" && preview?.grid?.length;
+    const matchingPreview = textPreview || (state.options.visualizerMode === "atari" ? preview?.atari
       : state.options.visualizerMode === "vm2" ? state.previewFrame?.vm2
         : state.options.visualizerMode === "nethack" ? state.previewFrame?.nethack
-          : state.options.visualizerMode === "pixelmusic" ? state.previewFrame?.pixelmusic : null;
-    state.currentFrame = matchingPreview
-      ? state.previewFrame : buildFrame(state.startedAt + 420, capture.width, capture.height, true);
+          : state.options.visualizerMode === "pixelmusic" ? state.previewFrame?.pixelmusic : null);
+    if (textPreview && (capture.width !== window.innerWidth || capture.height !== window.innerHeight)) {
+      // A different output format needs its own text grid, at the exact moment
+      // shown in the preview rather than the first word of the sequence.
+      const startedAt = state.startedAt;
+      state.startedAt = 0;
+      try { state.currentFrame = buildFrame(preview.elapsed, capture.width, capture.height, true); }
+      finally { state.startedAt = startedAt; }
+    } else {
+      state.currentFrame = matchingPreview
+        ? preview : buildFrame(state.startedAt + 420, capture.width, capture.height, true);
+    }
   }
   if (!state.currentFrame) return;
 

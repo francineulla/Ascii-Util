@@ -1,4 +1,4 @@
-param([ValidateSet('scene-regression.js', 'performance-features.js', 'atari-video-music.js', 'video-music-2.js', 'project-regression.js', 'render-modes.js', 'nethack-visualizer.js', 'display-controls.js', 'pixelmusic-3000.js', 'ui-regression.js', 'audio-controls.js')][string]$TestScript = 'scene-regression.js')
+param([ValidateSet('scene-regression.js', 'performance-features.js', 'atari-video-music.js', 'video-music-2.js', 'project-regression.js', 'render-modes.js', 'nethack-visualizer.js', 'display-controls.js', 'pixelmusic-3000.js', 'ui-regression.js', 'audio-controls.js', 'audio-setup.js', 'history-recovery.js', 'preset-gallery.js', 'preset-switching.js', 'security-hardening.js', 'live-transport.js', 'live-background.js', 'live-rendering.js', 'live-audio.js')][string]$TestScript = 'scene-regression.js')
 $ErrorActionPreference = 'Stop'
 $repoDir = Split-Path $PSScriptRoot -Parent
 $testDir = Join-Path $env:TEMP ('ascii-scene-tests-' + [guid]::NewGuid())

@@ -95,6 +95,7 @@ function syncToolUI() {
     controls[id].title = randomizerHelp[i];
   });
   controls.fpsCap.options[0].title = textMode ? "Uses the default FPS for the selected quality." : "Up to 60 FPS.";
+  if (typeof scheduleGalleryRefresh === "function") scheduleGalleryRefresh();
 }
 
 function updateAtariControls() {
@@ -211,6 +212,8 @@ function openAudioControls() {
 }
 
 function bindUIEvents() {
+  // Decorate actions before event listeners retain their function references.
+  installHistoryActions();
   for (const control of [intervalMode, intervalMinutes]) {
     control.addEventListener("change", () => {
       updateContextualControls();
@@ -238,19 +241,25 @@ function bindUIEvents() {
   controls.copySceneBank.addEventListener("click", copySceneBank);
   controls.loadSceneBank.addEventListener("click", loadSceneBank);
   document.getElementById("importSceneFile").addEventListener("click", () => document.getElementById("sceneFile").click());
+  let sceneFileReadId = 0;
   document.getElementById("sceneFile").addEventListener("change", async (event) => {
+    const request = ++sceneFileReadId;
     const file = event.target.files[0];
     if (!file) return;
     try {
-      if (file.size > maxSceneBankJsonChars * 4) throw new Error("Scene file is too large.");
-      controls.presetData.value = await file.text();
+      if (file.size > maxSceneBankJsonChars * 3) throw new Error("Scene file is too large.");
+      const text = await file.text();
+      if (request !== sceneFileReadId) return;
+      if (text.length > maxSceneBankJsonChars) throw new Error("Scene file is too large.");
+      controls.presetData.value = text;
       loadPreset();
     } catch (error) {
-      reportScene(`Scene file import failed: ${error.message}`);
+      if (request === sceneFileReadId) reportScene(`Scene file import failed: ${error.message}`);
     } finally {
-      event.target.value = "";
+      if (request === sceneFileReadId) event.target.value = "";
     }
   });
+  setupPresetFolder();
   controls.randomizeAll.addEventListener("click", randomizeAll);
   controls.tapTempo.addEventListener("click", tapTempo);
   controls.fullscreenButton.addEventListener("click", () => document.fullscreenElement ? exitFullscreen() : requestFullscreen());
@@ -276,9 +285,13 @@ function bindUIEvents() {
     const button = event.target instanceof Element ? event.target.closest("[data-slot]") : null;
     if (!button) return;
     const slot = Number(button.dataset.slot);
-    selectSceneSlot(slot);
-    if (event.shiftKey) storeScene(slot);
-    else recallScene(slot);
+    historyAction(event.shiftKey ? "Store scene" : "Recall scene", () => {
+      if (event.shiftKey) {
+        selectSceneSlot(slot);
+        storeScene(slot);
+      }
+      else recallScene(slot);
+    });
   });
   controls.applyDefaultScene.addEventListener("click", () => applyNamedPreset(controls.defaultScenePreset.value));
   controls.randomizeVisual.addEventListener("click", () => {
@@ -427,4 +440,70 @@ function bindUIEvents() {
   document.getElementById("nethackAudioSetup").addEventListener("click", openAudioControls);
   document.getElementById("pixelmusicAudioSetup").addEventListener("click", openAudioControls);
   window.addEventListener("pagehide", () => { disconnectAudio(); clearSceneTransition(); });
+}
+
+// Uses the File System Access API so the user can read/write the presets folder directly.
+function setupPresetFolder() {
+  const pick = document.getElementById("pickPresetFolder");
+  const list = document.getElementById("presetFolderFiles");
+  const load = document.getElementById("loadFolderPreset");
+  const save = document.getElementById("saveFolderPreset");
+  let dir = null;
+  if (typeof window.showDirectoryPicker !== "function") {
+    pick.disabled = true;
+    pick.title = "Folder access needs a Chromium-based browser (Chrome, Edge).";
+    return;
+  }
+  async function refresh(selectName) {
+    const names = [];
+    for await (const [name, handle] of dir.entries()) {
+      if (handle.kind === "file" && /\.json$/i.test(name)) names.push(name);
+    }
+    names.sort((a, b) => a.localeCompare(b));
+    list.replaceChildren(...names.map(name => new Option(name, name)));
+    if (selectName && names.includes(selectName)) list.value = selectName;
+    list.disabled = load.disabled = !names.length;
+    save.disabled = false;
+  }
+  pick.addEventListener("click", async () => {
+    try {
+      dir = await window.showDirectoryPicker({ id: "ascii-presets", mode: "readwrite" });
+      await refresh();
+      reportScene(`Presets folder: ${dir.name} (${list.options.length} JSON files)`);
+    } catch (error) {
+      if (error.name !== "AbortError") reportScene(`Folder access failed: ${error.message}`);
+    }
+  });
+  load.addEventListener("click", async () => {
+    try {
+      const file = await (await dir.getFileHandle(list.value)).getFile();
+      if (file.size > maxSceneBankJsonChars * 3) throw new Error("Scene file is too large.");
+      const text = await file.text();
+      if (text.length > maxSceneBankJsonChars) throw new Error("Scene file is too large.");
+      controls.presetData.value = text;
+      loadPreset();
+    } catch (error) {
+      reportScene(`Folder load failed: ${error.message}`);
+    }
+  });
+  save.addEventListener("click", async () => {
+    try {
+      const suggested = (String(controls.sceneName?.value || "").trim() || `scene-${state.selectedSceneSlot}`);
+      const input = window.prompt("Save as (.json). Saves the current scene; enter 'bank:name' to save all scenes.", suggested);
+      if (input == null) return;
+      const asBank = /^bank:/i.test(input);
+      const base = input.replace(/^bank:/i, "").trim().replace(/\.json$/i, "").replace(/[^\w\- .]/g, "_").replace(/^\.+/, "").slice(0, 80);
+      if (!base) throw new Error("Invalid file name.");
+      const name = `${base}.json`;
+      if (asBank) await copySceneBank(); else await copyPreset();
+      const handle = await dir.getFileHandle(name, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(controls.presetData.value);
+      await writable.close();
+      await refresh(name);
+      reportScene(`Saved ${name} to ${dir.name}`);
+    } catch (error) {
+      reportScene(`Folder save failed: ${error.message}`);
+    }
+  });
 }

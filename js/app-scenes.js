@@ -47,7 +47,21 @@ function saveSetup() {
 
 function loadSetup() {
   try {
-    const setup = JSON.parse(localStorage.getItem("asciiBpmSetup") || "{}");
+    const setup = parsePresetJson(localStorage.getItem("asciiBpmSetup") || "{}", "Saved setup", maxPresetJsonChars);
+    if (!setup || typeof setup !== "object" || Array.isArray(setup) || setup.controls != null && (typeof setup.controls !== "object" || Array.isArray(setup.controls))) throw new Error("Invalid saved setup");
+    for (const key of ["selectedSlot", "intervalMinutes"]) {
+      const value = setup[key];
+      if (value !== undefined && (!["number", "string"].includes(typeof value) || !Number.isFinite(Number(value)))) throw new Error("Invalid saved setup number");
+    }
+    if (setup.intervalMode !== undefined && typeof setup.intervalMode !== "boolean") throw new Error("Invalid saved interval mode");
+    if (setup.lockedValues != null && (typeof setup.lockedValues !== "object" || Array.isArray(setup.lockedValues))) throw new Error("Invalid saved locked values");
+    if (setup.lockedValues && presetFields.some(id => Object.prototype.hasOwnProperty.call(setup.lockedValues, id))) validateImportedScene(setup.lockedValues);
+    for (const id of setupControls) {
+      const value = setup.controls?.[id], control = document.getElementById(id);
+      if (value === undefined) continue;
+      if (!["string", "number", "boolean"].includes(typeof value)) throw new Error("Invalid saved control value");
+      if (control.type === "checkbox" ? typeof value !== "boolean" : control.tagName === "SELECT" ? !controlHasOption(control, String(value)) : !Number.isFinite(Number(value))) throw new Error("Invalid saved control value");
+    }
     state.selectedSceneSlot = clamp(Math.trunc(Number(setup.selectedSlot)) || 1, 1, sceneSlotCount);
     intervalMode.checked = setup.intervalMode === true;
     intervalMinutes.value = String(clamp(Number(setup.intervalMinutes) || 1, 0.1, 1440));
@@ -94,15 +108,41 @@ function getPreset() {
   }, {});
 }
 
+function checkSceneJsonStructure(text, label) {
+  let quoted = false, escaped = false, depth = 0, containers = 0, separators = 0;
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') quoted = false;
+      continue;
+    }
+    if (char === '"') quoted = true;
+    else if (char === "{" || char === "[") {
+      depth++;
+      containers++;
+    } else if (char === "}" || char === "]") depth--;
+    else if (char === ",") separators++;
+    // Valid scene banks are shallow dictionaries of scalar settings. Reject
+    // hostile nesting or huge arrays before JSON.parse allocates their objects.
+    if (depth > 16 || containers > 256 || separators > 4096) throw new Error(`${label} is too complex.`);
+  }
+}
+
 function parsePresetJson(raw, label = "Scene JSON", maxChars = maxPresetJsonChars) {
-  const text = String(raw || "").trim();
+  if (typeof raw !== "string") throw new Error(`${label} must be text.`);
+  if (raw.length > maxChars) throw new Error(`${label} is too large.`);
+  const text = raw.trim();
   if (!text) throw new Error(`${label} is empty.`);
-  if (text.length > maxChars) throw new Error(`${label} is too large.`);
+  checkSceneJsonStructure(text, label);
   return JSON.parse(text);
 }
 
 function parsePresetInput(raw, label = "Scene JSON", maxChars = maxPresetJsonChars) {
-  const text = String(raw || "").trim();
+  if (typeof raw !== "string") throw new Error(`${label} must be text.`);
+  if (raw.length > maxChars) throw new Error(`${label} is too large.`);
+  const text = raw.trim();
   if (text.startsWith("#preset=")) return decodePresetFromUrl(text.slice(8));
   if (/^(file|https?):/i.test(text) && text.includes("#preset=")) {
     return decodePresetFromUrl(new URL(text, location.href).hash.slice(8));
@@ -123,6 +163,8 @@ function normalizePreset(preset) {
   return presetFields.reduce((normalized, id) => {
     if (!Object.prototype.hasOwnProperty.call(preset, id) || !controls[id]) return normalized;
     const control = controls[id];
+    const rawValue = preset[id];
+    if (rawValue != null && !["string", "number", "boolean"].includes(typeof rawValue)) return normalized;
     if (control.type === "checkbox") {
       normalized[id] = preset[id] === true || preset[id] === "true" || preset[id] === 1 || preset[id] === "1";
       return normalized;
@@ -168,6 +210,7 @@ function applyPreset(preset, respectLocks = false) {
   }
   updateSliderReadouts();
   updateSceneDirty();
+  if (typeof reconcileMidiSync === "function") reconcileMidiSync();
 }
 
 async function copyPreset() {
@@ -191,14 +234,39 @@ function validateImportedScene(preset) {
   if (!preset || typeof preset !== "object" || Array.isArray(preset)) {
     throw new Error("Expected a scene settings object.");
   }
+  for (const id of presetFields) {
+    if (!Object.prototype.hasOwnProperty.call(preset, id) || !controls[id]) continue;
+    const value = preset[id], control = controls[id];
+    if (value != null && !["string", "number", "boolean"].includes(typeof value)) throw new Error(`Invalid ${id} value.`);
+    if (typeof value === "number" && !Number.isFinite(value)) throw new Error(`Invalid ${id} number.`);
+    if (control.type === "number" || control.type === "range") {
+      if (value == null || typeof value === "boolean" || String(value).trim() === "" || !Number.isFinite(Number(value))) throw new Error(`Invalid ${id} number.`);
+    } else if (control.tagName === "SELECT") {
+      if (!(id === "backgroundMode" && value === "nethack") && !controlHasOption(control, String(value))) throw new Error(`Unsupported ${id} choice.`);
+    } else if (control.type === "checkbox") {
+      if (![true, false, "true", "false", 1, 0, "1", "0"].includes(value)) throw new Error(`Invalid ${id} toggle.`);
+    } else {
+      const limit = id === "sceneName" ? 80 : id === "customCharset" ? maxCustomCharsetChars : control.tagName === "TEXTAREA" ? maxTextareaChars : maxTextInputChars;
+      if (String(value ?? "").length > limit) throw new Error(`${id} is too large.`);
+    }
+  }
   const normalized = normalizePreset(preset);
   if (!Object.keys(normalized).length) throw new Error("No recognized scene settings found.");
   return normalized;
 }
 
+function validateSceneEnvelope(payload, allowBank = true) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Expected a scene JSON object.");
+  if (payload.type === undefined) return payload;
+  if (!["ascii-bpm-scene", "ascii-bpm-scene-bank"].includes(payload.type) || !allowBank && payload.type === "ascii-bpm-scene-bank") throw new Error("Unsupported scene format.");
+  if (payload.version !== undefined && payload.version !== 1 && payload.version !== 2) throw new Error("Unsupported scene version.");
+  if (payload.type === "ascii-bpm-scene" && (!payload.preset || typeof payload.preset !== "object" || Array.isArray(payload.preset))) throw new Error("Expected scene settings inside preset.");
+  return payload;
+}
+
 function loadPreset() {
   try {
-    const payload = parsePresetInput(controls.presetData.value, "Scene JSON", maxSceneBankJsonChars);
+    const payload = validateSceneEnvelope(parsePresetInput(controls.presetData.value, "Scene JSON", maxSceneBankJsonChars));
     if (payload.type === "ascii-bpm-scene-bank") {
       importSceneBank(payload);
       return;
@@ -239,9 +307,12 @@ async function copySceneBank() {
 }
 
 function importSceneBank(payload) {
+  validateSceneEnvelope(payload);
+  if (payload.type !== "ascii-bpm-scene-bank") throw new Error("Expected an ascii-bpm-scene-bank JSON export.");
   if (!Array.isArray(payload.scenes) || payload.scenes.length > sceneSlotCount) {
     throw new Error("Expected a scene bank with up to eight slots.");
   }
+  if (payload.selectedSlot !== undefined && (payload.selectedSlot == null || typeof payload.selectedSlot === "object" || typeof payload.selectedSlot === "boolean" || !Number.isFinite(Number(payload.selectedSlot)))) throw new Error("Invalid selected scene slot.");
   const scenes = Array.from({ length: sceneSlotCount }, (_, index) =>
     payload.scenes[index] == null ? null : validateImportedScene(payload.scenes[index]));
   state.scenes = scenes;
@@ -265,7 +336,7 @@ function importSceneBank(payload) {
 
 function loadSceneBank() {
   try {
-    const payload = parsePresetInput(controls.presetData.value, "Scene bank JSON", maxSceneBankJsonChars);
+    const payload = validateSceneEnvelope(parsePresetInput(controls.presetData.value, "Scene bank JSON", maxSceneBankJsonChars));
     if (payload.type !== "ascii-bpm-scene-bank") {
       throw new Error("Expected an ascii-bpm-scene-bank JSON export.");
     }
@@ -283,8 +354,16 @@ function encodePresetForUrl(preset) {
 
 function decodePresetFromUrl(hash) {
   // Each UTF-16 code unit can require three UTF-8 bytes, then base64 expands by 4/3.
-  if (hash.length > maxPresetJsonChars * 4) throw new Error("Preset URL is too large.");
-  return parsePresetJson(decodeURIComponent(escape(atob(hash))), "Preset URL");
+  if (typeof hash !== "string" || hash.length > maxPresetJsonChars * 4) throw new Error("Preset URL is too large.");
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(hash) || hash.length % 4 === 1 || hash.includes("=") && hash.length % 4 !== 0) throw new Error("Invalid preset URL encoding.");
+  const padding = hash.endsWith("==") ? 2 : hash.endsWith("=") ? 1 : 0;
+  if (Math.floor(hash.length * 3 / 4) - padding > maxPresetJsonChars * 3) throw new Error("Preset URL is too large.");
+  const binary = atob(hash);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  const json = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  const payload = validateSceneEnvelope(parsePresetJson(json, "Preset URL"), false);
+  return validateImportedScene(payload.type === "ascii-bpm-scene" ? payload.preset : payload);
 }
 
 function loadPresetFromUrl() {
@@ -296,6 +375,7 @@ function loadPresetFromUrl() {
       updateSliderReadouts();
     } catch (error) {
       controls.obsReadout.textContent = "Preset URL failed";
+      return;
     }
   }
 
@@ -310,7 +390,7 @@ function randomizeSelect(control, random) {
   control.selectedIndex = Math.floor(random() * control.options.length);
 }
 
-function applyNamedPreset(name) {
+function getNamedPreset(name, base = getPreset()) {
   const extendedPresets = {
     pixelmusic3000: { ...pixelmusicDefaults, visualizerMode: "pixelmusic", livePreview: true, scanlines: true, invert: false },
     nethackVideo: { ...nethackDefaults, visualizerMode: "nethack", nhView: "follow", nhGlow: "60", livePreview: true, scanlines: false, invert: false },
@@ -321,9 +401,24 @@ function applyNamedPreset(name) {
   const preset = extendedPresets[name] || (name === "atariVideoMusic"
     ? { ...atariDefaults, visualizerMode: "atari", scanlines: true, invert: false, livePreview: true }
     : presetBank[name]);
-  if (!preset) return;
-  const nextPreset = { ...getPreset(), visualizerMode: "ascii", ...preset };
-  if (name === "galaxyMask" && !controls.maskArt.value.trim()) {
+  if (!preset) return null;
+  // Built-in looks are partial definitions. Reset the optional effects they
+  // own so a prior look cannot keep lyrics hidden, a mask enabled, or a
+  // different parsing/capture mode active. Keep user content and workspace
+  // preferences in base; applyPreset still preserves the global locked fields.
+  const lookDefaults = Object.fromEntries([
+    "backgroundOnly", "maskMode", "maskLayer", "maskScale", "haloSize",
+    "lyricMode", "autoSections", "sectionBars", "midiSync", "downbeatFlash",
+    "recordingMode", "captureSize", "invert", "scanlines"
+  ].map(id => {
+    const control = controls[id];
+    const value = control.type === "checkbox" ? control.defaultChecked
+      : control.tagName === "SELECT" ? (Array.from(control.options).find(option => option.defaultSelected) || control.options[0]).value
+        : control.defaultValue;
+    return [id, value];
+  }));
+  const nextPreset = { ...base, ...lookDefaults, visualizerMode: "ascii", ...preset };
+  if (name === "galaxyMask" && !String(base.maskArt || "").trim()) {
     nextPreset.maskArt = [
       "        .***.        ",
       "     .*********.     ",
@@ -336,6 +431,12 @@ function applyNamedPreset(name) {
       "        .***.        "
     ].join("\n");
   }
+  return nextPreset;
+}
+
+function applyNamedPreset(name) {
+  const nextPreset = getNamedPreset(name);
+  if (!nextPreset) return;
   if (name === "midiStrobe" && !navigator.requestMIDIAccess) {
     nextPreset.midiSync = false;
     setMidiStatus("not supported");
@@ -345,8 +446,9 @@ function applyNamedPreset(name) {
   schedulePreview();
 }
 
-function applyPresetNow(preset, fade = false) {
+function applyPresetNow(preset, fade = false, slot = null) {
   const transition = captureSceneTransition(fade);
+  if (slot !== null) selectSceneSlot(slot);
   applyPreset(preset, true);
   updateSliderReadouts();
   schedulePreview();
@@ -354,10 +456,11 @@ function applyPresetNow(preset, fade = false) {
   if (transition) playSceneTransition(transition);
 }
 
-function requestPresetChange(preset, label = "preset") {
+function requestPresetChange(preset, label = "preset", slot = null) {
   if (!state.running || state.paused || controls.transitionMode.value === "cut") {
     state.pendingPreset = null;
-    applyPresetNow(preset, false);
+    applyPresetNow(preset, false, slot);
+    if (slot !== null) resetSceneInterval(state.paused ? state.pausedAt : performance.now());
     reportScene(`Applied ${label}`);
     return;
   }
@@ -368,7 +471,7 @@ function requestPresetChange(preset, label = "preset") {
   const targetBeat = mode === "bar"
     ? (Math.floor(currentBeat / state.options.barLength) + 1) * state.options.barLength
     : currentBeat + 1;
-  state.pendingPreset = { preset, label, mode, targetBeat };
+  state.pendingPreset = { preset, label, mode, targetBeat, slot };
   reportScene(mode === "bar" ? `Queued ${label} for next bar` : `Queued ${label} for next beat`);
 }
 
@@ -378,19 +481,18 @@ function maybeApplyQueuedPreset(frame) {
   const shouldApply = frame.beatIndex >= queued.targetBeat;
   if (!shouldApply) return false;
   state.pendingPreset = null;
-  applyPresetNow(queued.preset, queued.mode === "fade");
+  applyPresetNow(queued.preset, queued.mode === "fade", queued.slot);
   reportScene(`Applied ${queued.label}`);
   return true;
 }
 
 function loadSceneSlots() {
   try {
-    const scenes = JSON.parse(localStorage.getItem("asciiBpmScenes") || "[]");
-    state.scenes = Array.isArray(scenes)
-      ? Array.from({ length: sceneSlotCount }, (_, index) => scenes[index] ? normalizePreset(scenes[index]) : null)
-      : [];
+    const scenes = parsePresetJson(localStorage.getItem("asciiBpmScenes") || "[]", "Saved scenes", maxSceneBankJsonChars);
+    if (!Array.isArray(scenes) || scenes.length > sceneSlotCount) throw new Error("Invalid saved scene bank");
+    const restored = Array.from({ length: sceneSlotCount }, (_, index) => scenes[index] == null ? null : validateImportedScene(scenes[index]));
+    state.scenes = restored;
   } catch (error) {
-    state.scenes = [];
     controls.sceneReadout.textContent = "Saved scenes could not be loaded";
   }
   refreshSceneButtons();
@@ -424,6 +526,7 @@ function refreshSceneButtons() {
       : "Click to select this empty slot, then press Store scene.";
   }
   updateSceneDirty();
+  if (typeof scheduleGalleryRefresh === "function") scheduleGalleryRefresh();
 }
 
 function selectSceneSlot(slot) {
@@ -448,9 +551,7 @@ function recallScene(slot = state.selectedSceneSlot) {
     reportScene(`Slot ${slot} is empty. Select it in setup and use Store scene or Import scene.`);
     return;
   }
-  selectSceneSlot(slot);
-  resetSceneInterval(state.paused ? state.pausedAt : performance.now());
-  requestPresetChange(preset, sceneLabel(slot, preset));
+  requestPresetChange(preset, sceneLabel(slot, preset), slot);
 }
 
 function clearScenes() {
@@ -744,5 +845,9 @@ function playSceneTransition(transition) {
     const incoming = controls.canvas.hidden ? controls.ascii : controls.canvas;
     transition.animations.push(incoming.animate([{ transform: "translateX(100%)" }, { transform: "translateX(0)" }], { duration, easing: "ease-in-out" }));
   }
-  animation.onfinish = () => { if (activeSceneTransition === transition) clearSceneTransition(); };
+  const finishTransition = () => { if (activeSceneTransition === transition) clearSceneTransition(); };
+  animation.onfinish = finishTransition;
+  // finish() resolves the promise before the browser dispatches its frame-bound
+  // finish event. Cleanup must also complete when that event is throttled.
+  animation.finished.then(finishTransition, () => {});
 }

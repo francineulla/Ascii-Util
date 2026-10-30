@@ -4,8 +4,15 @@
 bindUIEvents();
 loadSceneSlots();
 loadSetup();
+initHistory();
 loadPresetFromUrl();
+resetHistoryBaseline();
 updateSliderReadouts();
 applyTooltips();
 syncToolUI();
+initWorkspace();
+initAudioSetup();
+initMidiTransport();
+initGallery();
+initLiveProtection();
 schedulePreview();

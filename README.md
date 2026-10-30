@@ -12,7 +12,9 @@ Paste in words or lyrics, pick a seed and tempo, shape the render style, then hi
 - Separate Video Music 2 studio with flexible aspect ratios, eleven geometries, palette controls, glow, trails, symmetry, and motion
 - Pixelmusic 3000 with eight source-informed pixel patterns, five colour families, original or beat/bar automation, independent Hold/Next controls, and favourite patterns
 - ASCII NetHack dungeon in Video synthesizer mode, with seeded maps, an adventurer and companion, monsters, treasure, fog, audio dynamics, and discrete BPM-driven turns
-- Static or animated live preview behind the control panel, with a preview status/control bar that stays at the top while scrolling
+- Dedicated static or animated output monitor beside the controls, with mode, BPM, Go, preview controls, and Undo/Redo kept at the top while scrolling
+- Visual galleries for built-in looks and saved scenes, filtered by the current renderer or browsable across all modes
+- Undo/Redo for edits, randomizers, preset changes, and scene-bank changes, plus automatic local draft recovery
 - BPM input, tap tempo, and optional Web MIDI clock sync
 - Seeded visuals for repeatable looks
 - Four colour modes: classic glow, randomized field, word spotlight, and thermal depth
@@ -26,6 +28,7 @@ Paste in words or lyrics, pick a seed and tempo, shape the render style, then hi
 - Global locks for tempo, lyrics, palette, and performance settings
 - Crossfade, wipe, slide, and zoom-dissolve scene effects
 - Audio-reactive intensity with attack/release, noise gate, stereo meters, clipping indicators, and full-range/bass/mid/treble/transient responses
+- Named audio inputs, explicit reconnect, raw input meters, and a two-second noise-floor calibration
 - Interval Mode cycles saved scenes every configurable number of minutes
 - Fifteen colour palettes, including sunset, ocean, synthwave, aurora, rose, ice, ember, and monochrome
 - Scene JSON import/export for one scene or the full eight-scene bank
@@ -44,6 +47,20 @@ Paste in words or lyrics, pick a seed and tempo, shape the render style, then hi
 No build step, package install, or server is required.
 
 Both modes share one page. The top selector separates text controls from video synthesizer controls. **Video synthesizer** chooses **Atari Video Music**, **Video Music 2**, **NetHack dungeon**, or **Pixelmusic 3000**. Switching modes preserves the hidden settings. Tempo, scenes, audio connection, and output controls remain available where they apply.
+
+## Editing Workspace
+
+The output monitor sits beside the controls on wide screens and above them on narrow screens. It stays visible while you scroll. The top toolbar keeps **Render mode**, **Video synthesizer**, **BPM**, **Go**, preview controls, and **Undo/Redo** within reach. Enable **Live preview** for animation; **Refresh preview** redraws a static look.
+
+Open **Looks & scenes** to browse real rendered thumbnails. **Current mode** shows looks for the selected renderer; **All modes** lets you explore every synthesizer and text look. Click a preset to apply it, or a saved scene to recall it. An empty scene card selects a storage slot; **Store scene** saves your current look there. Shift-click a scene card to store directly.
+
+Built-in looks reset their optional lyric visibility, mask, parsing, section, MIDI, flash, and capture effects before applying the selected look. Switching away from **Background pulse** restores lyrics, and unrelated effects do not carry into the next preset. Your words, seed, BPM, and mask artwork stay in place; enabled global locks preserve their grouped settings.
+
+**Undo/Redo** covers control edits, randomizers, presets, scene recall, storing, imports, and clearing the bank. Typing and slider movement are grouped into edit steps. Outside text/number fields, use `Ctrl/Cmd+Z` to undo and `Ctrl/Cmd+Shift+Z` or `Ctrl/Cmd+Y` to redo. Text fields retain the browser's native editing shortcuts. History is bounded and lasts for the current page session; undoing a bank change also restores its browser-saved contents.
+
+A queued scene keeps the playing scene selected until the transition applies. Undo cancels a pending transition; once applied, one Undo restores both the previous look and its slot. Undo while paused preserves the frozen musical position and scene countdown. Incoming MIDI tempo stays outside edit history, while explicit manual tempo changes retain their Undo/Redo values.
+
+Your unfinished look and setup are saved automatically as a local draft and restored on reload, including edits that have not been stored in a scene. **Store scene** still commits a reusable scene slot. Draft status appears in the toolbar, including storage failures. A preset in a share/OBS URL takes precedence over the recovered draft. Restoring work never opens an audio or MIDI connection.
 
 ## NetHack Dungeon
 
@@ -157,7 +174,7 @@ The menu shows the collapsible sections and individual controls relevant to the 
 
 Under **Display**, enable **Scanlines** and adjust strength (0–40%), spacing (2–12 pixels), and thickness (10–75% of the spacing). The thickness range leaves a clear gap between lines. The defaults—8% strength, 4-pixel spacing, and 25% thickness (1 pixel)—preserve the previous look. These settings apply to preview, playback, and PNG export in every mode, travel with scenes and presets, and fall back to those defaults when loading older scenes. Turning scanlines off preserves the slider values.
 
-Unavailable options are disabled while keeping their settings. The BPM/mode/FPS readout, **Live preview** toggle, and **Refresh preview** button stay at the top while scrolling through setup. Utilities and scene slots adapt to narrow screens. **Fullscreen** toggles browser fullscreen. During playback, pointer movement, a tap, or keyboard focus reveals **Menu** and **Pause / Resume** controls; touch devices keep them visible.
+Unavailable options are disabled while keeping their settings. The mode selector, BPM, Go, preview controls, and edit history stay at the top while scrolling through setup. Utilities and scene slots adapt to narrow screens. **Fullscreen** toggles browser fullscreen. During playback, pointer movement, a tap, or keyboard focus reveals **Menu** and **Pause / Resume** controls; touch devices keep them visible.
 
 ## Keyboard Shortcuts
 
@@ -206,7 +223,7 @@ The importer also accepts copied share URLs containing `#preset=`. Scenes create
 
 Name a scene in **Scene name**, then use **Store scene** to save the name and settings. Names are optional `sceneName` fields inside the existing flat preset objects; scene and bank exports keep their existing version 2 wrappers. Older unnamed scenes, version 1/2 banks, raw presets, and share URLs still import. Missing names display as **Scene 1**, **Scene 2**, etc. Older app versions can ignore the new field and read the remaining settings.
 
-The status beside the name shows whether the current scene has unsaved changes. **Revert to saved** recalls the selected stored scene. Global locked fields are excluded from this comparison because they are held separately from the recalled scene. The indicator does not autosave edits; use **Store scene** to commit them.
+The status beside the name shows whether the current scene has unsaved changes. **Revert to saved** recalls the selected stored scene. Global locked fields are excluded from this comparison because they are held separately from the recalled scene. Draft recovery preserves unfinished edits separately; use **Store scene** to commit them to a reusable slot.
 
 **Global locks** keep current tempo (including beat rate, bar/section length, and MIDI sync), lyrics (including parsing/sections), palette (including colour mode and inversion), or performance (quality, FPS, glyph size, capture size, recording mode) while recalling scenes or applying looks. Imports save the complete imported scene while keeping locked controls in place. Lock choices and their current values are remembered in this browser. Explicitly storing a scene saves the current controls, including locked values.
 
@@ -215,6 +232,10 @@ The status beside the name shows whether the current scene has unsaved changes. 
 ## Audio Reactive
 
 Choose **Microphone / audio input** or **Shared tab / system audio**, then click **Connect audio** and use the browser's permission picker. For tab/system audio, choose a source that supports audio and enable **Share audio**. Availability depends on the browser and selected source; a share without an audio track produces a message and can be retried. Browser capture requires a supported secure page context, such as localhost or HTTPS (Chrome also supports local files).
+
+**Audio input device** lists microphones, mixers, and audio interfaces; the browser may hide their names until you allow capture. **Refresh inputs** updates the list without requesting permission. Your preferred input is remembered locally. Changing the device or source while connected keeps the current stream until you explicitly click **Reconnect audio**. Removed inputs remain identified as unavailable so you can choose a replacement.
+
+Under **Set up your signal**, raw left/right meters show input levels in dBFS before the gate or sensitivity is applied. **Measure noise floor** listens for two seconds: leave the source quiet while it measures, then the app sets the gate six decibels above the measured floor. A loud or incomplete measurement leaves the gate unchanged and explains how to retry. Play your loudest passage and adjust sensitivity for a useful visual range; reduce the source volume if clipping persists. Disconnecting cancels a measurement.
 
 **Sensitivity** adjusts the strength of the visual response. The combined meter and separate **Left**/**Right** meters show the smoothed response; per-channel clipping indicators briefly light when the captured signal approaches full scale. Mono inputs feed both channels, while stereo remains independent.
 
@@ -239,17 +260,35 @@ Use **Copy OBS URL** to generate a capture-friendly URL that opens directly into
 
 PNG exports use those exact pixel dimensions on high-DPI displays and include the current inversion and scanlines. Atari and Pixelmusic output fit their 4:3 pictures unless their **Stretch to fill screen** setting is enabled; Video Music 2 uses its selected aspect ratio within the export dimensions. Native NetHack output uses the selected whole-map or follow camera within the capture area.
 
+ASCII exports capture the word and beat shown in the preview. A fixed output size reflows the text grid at that same moment.
+
 ## MIDI Sync
 
 Chrome supports Web MIDI on compatible systems. Use **Connect MIDI**, choose an input, then enable **MIDI tempo sync**. MIDI clock messages can drive tempo, and MIDI start/stop messages can start or stop playback.
 
-Incoming tempo also updates the menu preview. Selecting **No MIDI input** detaches clock messages. While playback is paused, clock messages and BPM nudges preserve its frozen beat position. MIDI **Start** restarts and resumes a paused display; **Continue** resumes from its paused position. Keyboard tempo and inversion changes are remembered when their global locks are enabled.
+Incoming tempo also updates the menu preview. Selecting **No MIDI input** detaches clock messages. While playback is paused, clock messages and BPM nudges preserve its frozen beat position. MIDI **Start** restarts playback; **Continue** resumes from a pause or the last MIDI **Stop**, retaining the musical position and remaining scene interval. Starting with **Go** or stopping manually clears that saved MIDI position. Keyboard tempo and inversion changes are remembered when their global locks are enabled.
 
 ## Privacy And Security
 
 ASCII BPM Cycler runs entirely in the browser. It does not require a backend and does not send lyrics, presets, MIDI data, or scene JSON anywhere by itself.
 
-Stored scenes live in browser `localStorage`. Imported scene JSON is size-limited and normalized before it is applied to controls.
+Stored scenes, local drafts, setup preferences, and the selected audio device identifier live in browser `localStorage`. Imported scene JSON and recovered drafts are size-limited and normalized before they are applied to controls.
+
+The page enforces a [Content Security Policy](https://www.w3.org/TR/CSP/) that blocks inline scripts, dynamic code evaluation, remote scripts, and outgoing fetch connections. Scene labels, lyrics, and error details are displayed as text. File, JSON, base64, UTF-8, nesting, and scene-bank validation happen before imported data changes the active look. Invalid saved data leaves the current state intact. Sparse ASCII masks retain sparse rows instead of padding them into a potentially enormous rectangle.
+
+## Live Shows
+
+**Keep screen awake during playback** requests browser screen protection on Go, keeps it during Pause, and releases it on Menu, errors, or page exit. Returning to a visible playback tab requests it again. The status under Performance reports whether protection is active or unavailable; operating-system sleep and display settings still need to suit your show. This uses Chrome's [Screen Wake Lock API](https://developer.chrome.com/docs/capabilities/web-apis/wake-lock).
+
+MIDI reports acquiring, locked, lost, and disconnected clock states. If the clock disappears, visuals continue at the last tempo while waiting for it to return. Reconnecting the selected port restores clock reception. Malformed/out-of-order clock messages are ignored. MIDI tempo updates bypass edit-history snapshots and immediate browser storage; the final tempo saves on return to setup or page exit. Manual tempo edits remain undoable.
+
+During playback, gallery thumbnails and automatic draft/setup writes pause. Changes remain available in the current session and flush to browser storage on return to setup or page exit; a browser/process crash before that flush can lose those deferred changes. Explicit scene Store, Import, Clear, and their bank Undo operations still save immediately. History shares unchanged scene-bank snapshots and has both entry and memory bounds. Background tabs suspend setup previews and gallery work.
+
+Large screens use at most 60,000 ASCII cells, 8,294,400 stage backing pixels, and 2,073,600 preview backing pixels; backing dimensions are capped at 8,192 pixels. Glyphs grow when necessary to stay within the cell budget. These protections bound allocation and display memory; they do not promise a particular FPS on every machine. Fixed PNG export sizes remain exact.
+
+Renderer errors stop the frame loop and retain the last successful picture when the display context is still available. **Retry look**, **Safe look**, and **Menu** offer recovery. Safe look stops interval cycling and uses the browser's text display, so it works without the canvas renderer or recalling a failing scene. Canvas context loss also exposes these controls. Audio analysis failures release the input while visual playback continues. If the browser suspends audio, **Resume audio** retries the existing connection without requesting capture again.
+
+Run the complete browser checks with `powershell -NoProfile -ExecutionPolicy Bypass -File tests/run-all.ps1`. The live checks include clock/device failures, cancellation races, renderer recovery, high-resolution budgets, hostile imports, large banks, and 300 rendered frames sampled across an hour of simulated musical time in each mode. Reported CPU timings are diagnostic measurements from the test machine. Audio/MIDI hardware permissions, projector switching, operating-system sleep, and the intended show duration still need an interactive rehearsal on the actual show computer.
 
 ## Browser Support
 
@@ -272,6 +311,10 @@ The app uses ordered classic scripts so opening `index.html` directly still work
 - `js/app-export.js`: share/OBS URLs and PNG capture
 - `js/app-audio.js`: capture lifecycle, stereo analysis, envelopes, gate, meters, and signal routing
 - `js/app-ui.js`: contextual controls, readouts, keyboard shortcuts, and event handlers
+- `js/app-history.js`: bounded edit history, recoverable drafts, and reversible scene actions
+- `js/app-gallery.js`: preset/scene cards and isolated, cached renderer thumbnails
+- `js/app-workspace.js`: responsive toolbar and output monitor positioning
+- `js/app-live.js`: screen wake protection and canvas-error recovery controls
 - `js/atari-video-music.js`: Atari Video Music signal model and canvas renderer
 - `js/video-music-2.js`: extended geometry, aspect ratios, palettes, motion, and trails
 - `js/nethack-visualizer.js`: original seeded dungeon generation, discrete beat-driven exploration, and ASCII grid/canvas rendering
@@ -282,6 +325,10 @@ Keep the script order in `index.html`: synth engines first, then data/state, app
 Open `index.html` directly after editing to test changes.
 
 On Windows with Chrome installed, run `powershell -NoProfile -ExecutionPolicy Bypass -File tests/scene-regression.ps1` to check scene shortcuts, imports, storage failure handling, and persistence across reloads using a temporary browser profile.
+
+Use `-TestScript audio-setup.js` for device enumeration/reconnect, raw meters, calibration, and preference reload; `-TestScript history-recovery.js` for edit/bank Undo/Redo, paused playback, draft failures/recovery, and shared URL precedence; and `-TestScript preset-gallery.js` for real thumbnails, filtering, scene actions, and rendering isolation.
+
+Use `-TestScript security-hardening.js` for hostile and oversized imports, strict atomic validation, sparse masks, and bounded parsing; `-TestScript live-transport.js` for clock loss, unplug/replug, permission races, frame-loop ownership, and failure recovery; `-TestScript live-background.js` for live storage/thumbnail suppression and bounded shared history; `-TestScript live-rendering.js` for large-display budgets, all-mode elapsed-time sampling, recovery, wake protection, and enforced CSP; and `-TestScript live-audio.js` for suspended/failed audio contexts and exception-safe device cleanup.
 
 Run the same command with `-TestScript performance-features.js` for legacy/named imports, dirty state, locks, slide effects, and simulated audio signal/lifecycle checks. Actual microphone and shared-audio permissions require an interactive browser check.
 

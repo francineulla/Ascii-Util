@@ -53,6 +53,7 @@
     try {
       await loaded;
       const doc = frame.contentDocument;
+      doc.documentElement.style.setProperty("--toolbar-height", `${Math.ceil(doc.querySelector(".title-row").getBoundingClientRect().height)}px`);
       const viewport = doc.documentElement.clientWidth;
       assert(frame.contentWindow.innerWidth === width, `${mode}: iframe uses its requested ${width}px viewport`);
       assert(doc.documentElement.scrollWidth <= viewport + 1 && doc.body.scrollWidth <= viewport + 1,
@@ -79,7 +80,7 @@
         }
       } else {
         const view = frame.contentWindow, bar = doc.querySelector(".title-row");
-        const picker = doc.querySelector(".visualizer-picker");
+        const picker = doc.querySelector(".control-panel");
         const pickerStart = picker.getBoundingClientRect().top;
         const maxScroll = doc.scrollingElement.scrollHeight - view.innerHeight;
         assert(maxScroll > 600, `${mode}: fixture has enough content to exercise sticky scrolling at ${width}px`);
@@ -94,7 +95,7 @@
           if (previousBarTop !== null) assert(Math.abs(rect.top - previousBarTop) <= 1,
             `${mode}: preview bar holds its top position during continued scrolling at ${width}px`);
           previousBarTop = rect.top;
-          for (const id of ["previewReadout", "livePreview", "refreshPreview"]) {
+          for (const id of ["previewReadout", "livePreview", "refreshPreview", "toolMode", "bpm", "start", "undoEdit", "redoEdit"]) {
             const control = doc.getElementById(id), bounds = control.getBoundingClientRect();
             assert(bounds.width > 0 && bounds.top >= rect.top && bounds.bottom <= rect.bottom + 1,
               `${mode}: ${id} stays visible inside the sticky bar at ${width}px`);
@@ -104,6 +105,12 @@
           }
           assert(doc.documentElement.scrollWidth <= viewport + 1 && doc.body.scrollWidth <= viewport + 1,
             `${mode}: sticky preview bar causes no horizontal overflow while scrolling at ${width}px`);
+          const preview = doc.getElementById("previewPanel").getBoundingClientRect();
+          assert(preview.top >= rect.bottom - 1 && preview.bottom <= view.innerHeight + 1,
+            `${mode}: output preview stays visible below the toolbar at ${width}px`);
+          const centre = doc.elementFromPoint(preview.left + preview.width / 2, preview.top + preview.height / 2);
+          assert(centre && doc.querySelector(".preview-workbench").contains(centre),
+            `${mode}: settings do not cover the output monitor at ${width}px`);
         }
       }
     } finally { frame.remove(); }
